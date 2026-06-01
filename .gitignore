@@ -2,7 +2,7 @@
 /walkthrough.md
 /architecture_flow.md
 /issues_and_resolutions.md
-/backend_todo.md
+# /backend_todo.md
 test_ws_prod.py
 test_ws.py
 .firebase
