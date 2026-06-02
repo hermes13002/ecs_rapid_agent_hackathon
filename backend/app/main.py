@@ -15,6 +15,7 @@ from app.routers.auth import router as auth_router
 from app.routers.chat import router as chat_router
 from app.routers.ws_ide import router as ws_ide_router
 from app.routers.ws_simulate import router as ws_simulate_router
+from app.google_agent.tool_endpoints import router as tools_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,6 +33,7 @@ app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(ws_ide_router)
 app.include_router(ws_simulate_router)
+app.include_router(tools_router)
 
 app.add_middleware(
     CORSMiddleware,

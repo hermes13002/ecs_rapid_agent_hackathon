@@ -29,6 +29,8 @@ async def ws_simulate(websocket: WebSocket, token: str = Query(None)):
         return
 
     await websocket.accept()
+    from app.core.ws_manager import manager
+    manager.connect(websocket, user_id)
     logger.info(f"ws client connected for user: {user_id}")
 
     try:
@@ -187,3 +189,5 @@ async def ws_simulate(websocket: WebSocket, token: str = Query(None)):
             await websocket.close(code=1011)
         except Exception:
             pass
+    finally:
+        manager.disconnect(websocket, user_id)
