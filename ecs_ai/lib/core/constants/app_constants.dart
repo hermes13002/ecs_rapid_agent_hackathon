@@ -31,10 +31,10 @@ abstract final class AppConstants {
 /// global configuration for api connections
 abstract final class ApiConstants {
   // IMPORTANT: For local development, use localhost. 
-  // For production deployment, replace these with your actual Render URL.
-  // e.g., 'https://ecs-ai-backend.onrender.com'
-  // e.g., 'wss://ecs-ai-backend.onrender.com'
   
+  // static const String baseUrl = 'https://ecs-rapid-agent-hackathon-609652852189.africa-south1.run.app';
+  // static const String wsUrl = 'wss://ecs-rapid-agent-hackathon-609652852189.africa-south1.run.app';
+
   static const String baseUrl = 'https://ecs-ai-9ywk.onrender.com';
   static const String wsUrl = 'wss://ecs-ai-9ywk.onrender.com';
 }

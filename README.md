@@ -15,23 +15,23 @@ A modern, high-performance Electronic Design Automation (EDA) and schematic capt
 
 ## Features
 
-### AI Features (Powered by Gemini & Agent Builder)
-* **AI Co-pilot Chat**: An integrated intelligent assistant that can answer questions about your circuit or electronics concepts.
-* **Autonomous Circuit Design**: The AI can actively modify, add, or fix components on your canvas directly from the chat.
-* **Automated Troubleshooting**: Automatically detects simulation errors and provides actionable, step-by-step resolution reasoning.
-* **Component Catalog & History**: Leverages the MongoDB MCP Server to intelligently search for components and load past projects.
+### Agentic Orchestration (Powered by Gemini & Agent Builder)
+* **State-Injected Contextual Awareness**: Real-time circuit topologies are serialized directly into the agent's system prompt, eliminating inspect-loop latency for instant reasoning.
+* **Autonomous Schematic Manipulation**: Gemini securely invokes OpenAPI-compliant REST endpoints to programmatically inject, modify, or tear down schematic elements.
+* **Heuristic Diagnostics**: The agent proactively intercepts simulation failures, cross-referencing node physics to generate actionable, multi-step resolution strategies.
+* **MCP Data Grounding**: Natively leverages the MongoDB Model Context Protocol (MCP) server to semantically query historical project schemas and component metadata.
 
-### Frontend Features
-* **Infinite Hardware Canvas**: Custom transformation matrices supporting infinite pan, zoom, and continuous sub-grid alignments.
-* **Orthogonal Wiring**: Manhattan-style routing algorithm that supports rigid corner-locking drops and multi-segment axis constraint topologies.
-* **Animated Current Flow**: Dynamic, real-time visualization of current direction and magnitude moving through wires.
-* **Live Diagnostic Overlays**: Hover over components to instantly view calculated current, power, and voltage drops.
-* **Cross-Platform**: Seamlessly runs on Windows desktop, Web browsers and Android tablets.
+### High-Fidelity IDE (Flutter Canvas Engine)
+* **Unbound Spatial Canvas**: Employs custom mathematical transformation matrices for hardware-accelerated, infinite panning and sub-grid precision alignment.
+* **Orthogonal Routing Heuristics**: Manhattan-style wire routing algorithm enforcing rigid, non-overlapping corner locks across multi-segment axis topologies.
+* **Live Diagnostic Overlays**: High-performance, floating UI overlays instantly display reactive SPICE metrics (Current, Voltage, Power) upon cursor hover events.
+* **Electron-Flow Telemetry**: Smooth 60fps kinetic animation visualizing magnitude and direction of current flow across nodal wires.
+* **Professional UI Architecture**: Modern, dark-themed UI components built with robust flex-layouts and custom typography, completely avoiding default structural overflows.
 
-### Backend Features (Hybrid Architecture)
-* **Real-time SPICE Integration**: Instantly translates the frontend JSON schematic into a SPICE netlist and executes Operating Point analyses.
-* **Robust WebSocket Streaming**: Decoupled, bi-directional sockets for continuous simulation polling and live UI updates.
-* **REST Tool Orchestration**: Exposes `ide_tools` as OpenAPI REST endpoints for the Google Cloud Agent Builder to execute actions safely.
+### Hybrid Backend Architecture
+* **Synchronous SPICE Translation**: Low-latency translation layer mapping JSON-defined node graphs into valid Ngspice netlists for Operating Point (OP) analysis.
+* **Bi-directional WebSocket Pipeline**: Decoupled socket architecture for continuous telemetry streaming, syncing hardware physics back to the UI state without polling latency.
+* **Exposed IDE Toolchain**: Core system tools (`ide_tools`) are abstracted and secured as modular REST APIs, serving as the bridge for external autonomous agent execution.
 
 ## Architecture Flow (Hybrid Model)
 
