@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -102,7 +103,8 @@ class _IdeChatPanelState extends State<IdeChatPanel> {
           if (line.trim().isEmpty) continue;
           try {
             final parsed = jsonDecode(line.trim());
-            if (parsed is Map<String, dynamic> && parsed.containsKey('action_type')) {
+            if (parsed is Map<String, dynamic> &&
+                parsed.containsKey('action_type')) {
               actions.add(parsed);
             }
           } catch (e) {
@@ -121,8 +123,8 @@ class _IdeChatPanelState extends State<IdeChatPanel> {
       selectable: true,
       builders: {
         'latex': LatexElementBuilder(
-          textStyle: TextStyle(
-            color: isUser ? AppColors.primary : AppColors.textPrimary,
+          textStyle: GoogleFonts.jetBrainsMono(
+            color: AppColors.textPrimary,
             fontSize: 13,
           ),
         ),
@@ -132,11 +134,8 @@ class _IdeChatPanelState extends State<IdeChatPanel> {
         [LatexInlineSyntax()],
       ),
       styleSheet: MarkdownStyleSheet(
-        p: TextStyle(
-          fontSize: 12,
-          color: isUser ? AppColors.primary : AppColors.textPrimary,
-        ),
-        code: const TextStyle(
+        p: GoogleFonts.inter(fontSize: 12, color: AppColors.textPrimary),
+        code: GoogleFonts.jetBrainsMono(
           fontSize: 12,
           color: AppColors.primary,
           backgroundColor: AppColors.surface,
@@ -149,9 +148,11 @@ class _IdeChatPanelState extends State<IdeChatPanel> {
         blockquoteDecoration: BoxDecoration(
           color: AppColors.error.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(4),
-          border: const Border(left: BorderSide(color: AppColors.error, width: 4)),
+          border: const Border(
+            left: BorderSide(color: AppColors.error, width: 4),
+          ),
         ),
-        blockquote: const TextStyle(color: AppColors.error),
+        blockquote: GoogleFonts.inter(color: AppColors.error),
       ),
     );
   }
@@ -159,9 +160,10 @@ class _IdeChatPanelState extends State<IdeChatPanel> {
   @override
   Widget build(BuildContext context) {
     final rawHistory = List<Map<String, dynamic>>.from(widget.chatHistory);
-    if (widget.streamingText.isNotEmpty || widget.currentTurnActions.isNotEmpty) {
+    if (widget.streamingText.isNotEmpty ||
+        widget.currentTurnActions.isNotEmpty) {
       rawHistory.add({
-        'role': 'assistant', 
+        'role': 'assistant',
         'content': widget.streamingText,
         'actions': widget.currentTurnActions,
       });
@@ -171,32 +173,36 @@ class _IdeChatPanelState extends State<IdeChatPanel> {
     for (final msg in rawHistory) {
       final role = msg['role'];
       final content = msg['content']?.toString() ?? '';
-      
+
       if (role == 'user' && content.startsWith('System Action Result:')) {
         continue;
       }
-      
+
       final isModel = role == 'model' || role == 'assistant';
-      
+
       if (isModel && displayHistory.isNotEmpty) {
         final lastMsg = displayHistory.last;
         final lastRole = lastMsg['role'];
         if (lastRole == 'model' || lastRole == 'assistant') {
           final lastContent = lastMsg['content']?.toString() ?? '';
-          
+
           final lastActionsRaw = lastMsg['actions'];
           final newActionsRaw = msg['actions'];
-          
+
           dynamic mergedActions;
           if (lastActionsRaw == null && newActionsRaw == null) {
             mergedActions = null;
           } else {
-            final l = lastActionsRaw != null ? List<Map<String, dynamic>>.from(lastActionsRaw) : <Map<String, dynamic>>[];
-            final n = newActionsRaw != null ? List<Map<String, dynamic>>.from(newActionsRaw) : <Map<String, dynamic>>[];
+            final l = lastActionsRaw != null
+                ? List<Map<String, dynamic>>.from(lastActionsRaw)
+                : <Map<String, dynamic>>[];
+            final n = newActionsRaw != null
+                ? List<Map<String, dynamic>>.from(newActionsRaw)
+                : <Map<String, dynamic>>[];
             final combined = [...l, ...n];
             mergedActions = combined.isEmpty ? null : combined;
           }
-          
+
           displayHistory.last = {
             'role': 'assistant',
             'content': '$lastContent\n\n$content'.trim(),
@@ -205,7 +211,7 @@ class _IdeChatPanelState extends State<IdeChatPanel> {
           continue;
         }
       }
-      
+
       displayHistory.add(Map<String, dynamic>.from(msg));
     }
 
@@ -213,61 +219,109 @@ class _IdeChatPanelState extends State<IdeChatPanel> {
       children: [
         // --- Header for Chat Sessions ---
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          height: 40,
           decoration: const BoxDecoration(
             border: Border(bottom: BorderSide(color: AppColors.divider)),
           ),
           child: Row(
             children: [
               Expanded(
-                child: Text(
-                  widget.activeSessionId == null
-                      ? 'New Conversation'
-                      : (widget.chatSessions.firstWhere((s) => s['id'] == widget.activeSessionId, orElse: () => {'title': 'Conversation'})['title'] as String? ?? 'Conversation'),
-                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.history, size: 16, color: AppColors.textSecondary),
-                tooltip: 'Chat History',
-                color: AppColors.surface,
-                offset: const Offset(0, 30),
-                padding: EdgeInsets.zero,
-                itemBuilder: (context) {
-                  if (widget.chatSessions.isEmpty) {
-                    return [
-                      const PopupMenuItem<String>(
-                        enabled: false,
-                        child: Text(
-                          'No previous sessions',
-                          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                child: InkWell(
+                  onTap: widget.onNewChat,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: widget.activeSessionId == null
+                              ? AppColors.primary
+                              : Colors.transparent,
+                          width: 2,
                         ),
                       ),
-                    ];
-                  }
-                  return widget.chatSessions.map((session) {
-                    return PopupMenuItem<String>(
-                      value: session['id'] as String?,
-                      child: Text(
-                        session['title'] as String? ?? 'Conversation',
-                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  }).toList();
-                },
-                onSelected: widget.onSessionSelected,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.add,
+                          size: 16,
+                          color: widget.activeSessionId == null
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'New Chat',
+                          style: GoogleFonts.inter(
+                            color: widget.activeSessionId == null
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
+                            fontSize: 13,
+                            fontWeight: widget.activeSessionId == null
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: const Icon(Icons.add, size: 18, color: AppColors.textPrimary),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                tooltip: 'New Chat',
-                onPressed: widget.onNewChat,
+              Expanded(
+                child: PopupMenuButton<String>(
+                  color: AppColors.surface,
+                  offset: const Offset(0, 40),
+                  tooltip: 'Chat History',
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.history,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'History',
+                        style: GoogleFonts.inter(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                  itemBuilder: (context) {
+                    if (widget.chatSessions.isEmpty) {
+                      return [
+                        PopupMenuItem<String>(
+                          enabled: false,
+                          child: Text(
+                            'No previous sessions',
+                            style: GoogleFonts.inter(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ];
+                    }
+                    return widget.chatSessions.map((session) {
+                      return PopupMenuItem<String>(
+                        value: session['id'] as String?,
+                        child: Text(
+                          session['title'] as String? ?? 'Conversation',
+                          style: GoogleFonts.inter(
+                            color: AppColors.textPrimary,
+                            fontSize: 13,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList();
+                  },
+                  onSelected: widget.onSessionSelected,
+                ),
               ),
             ],
           ),
@@ -286,7 +340,9 @@ class _IdeChatPanelState extends State<IdeChatPanel> {
               }
             },
             child: ScrollConfiguration(
-              behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+              behavior: ScrollConfiguration.of(
+                context,
+              ).copyWith(scrollbars: false),
               child: Scrollbar(
                 controller: _scrollController,
                 thumbVisibility: true,
@@ -298,243 +354,400 @@ class _IdeChatPanelState extends State<IdeChatPanel> {
                   padding: const EdgeInsets.all(8.0),
                   itemCount: displayHistory.length,
                   itemBuilder: (context, index) {
-              final msg = displayHistory[index];
-              final isUser = msg['role'] == 'user';
-              final rawContent = msg['content'] ?? '';
-              final msgActionsRaw = msg['actions'];
-              final actions = msgActionsRaw != null ? List<Map<String, dynamic>>.from(msgActionsRaw) : (!isUser ? _extractActions(rawContent) : <Map<String, dynamic>>[]);
-              
-              String thoughtText = '';
-              String summaryText = '';
-              
-              if (!isUser) {
-                 final regex = RegExp(r'```json\s*.*?(?:```|$)', dotAll: true);
-                 final matches = regex.allMatches(rawContent);
-                 if (matches.isNotEmpty) {
-                    thoughtText = rawContent.substring(0, matches.first.start).trim();
-                    summaryText = rawContent.substring(matches.last.end).trim();
-                 } else {
-                    if (widget.isGenerating && rawContent == widget.streamingText) {
-                        thoughtText = rawContent.trim();
+                    final msg = displayHistory[index];
+                    final isUser = msg['role'] == 'user';
+                    final rawContent = msg['content'] ?? '';
+                    final msgActionsRaw = msg['actions'];
+                    final actions = msgActionsRaw != null
+                        ? List<Map<String, dynamic>>.from(msgActionsRaw)
+                        : (!isUser
+                              ? _extractActions(rawContent)
+                              : <Map<String, dynamic>>[]);
+
+                    String thoughtText = '';
+                    String summaryText = '';
+
+                    if (!isUser) {
+                      final regex = RegExp(
+                        r'```json\s*.*?(?:```|$)',
+                        dotAll: true,
+                      );
+                      final matches = regex.allMatches(rawContent);
+                      if (matches.isNotEmpty) {
+                        thoughtText = rawContent
+                            .substring(0, matches.first.start)
+                            .trim();
+                        summaryText = rawContent
+                            .substring(matches.last.end)
+                            .trim();
+                      } else {
+                        if (widget.isGenerating &&
+                            rawContent == widget.streamingText) {
+                          thoughtText = rawContent.trim();
+                        } else {
+                          summaryText = rawContent.trim();
+                        }
+                      }
                     } else {
-                        summaryText = rawContent.trim();
+                      summaryText = rawContent.trim();
                     }
-                 }
-              } else {
-                 summaryText = rawContent.trim();
-              }
 
-              if (thoughtText.isEmpty && summaryText.isEmpty && actions.isEmpty) return const SizedBox.shrink();
+                    if (thoughtText.isEmpty &&
+                        summaryText.isEmpty &&
+                        actions.isEmpty)
+                      return const SizedBox.shrink();
 
-              return Align(
-                alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 8.0),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isUser
-                        ? AppColors.primary.withValues(alpha: 0.1)
-                        : AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isUser
-                          ? AppColors.primary.withValues(alpha: 0.2)
-                          : AppColors.surfaceVariant,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment:
-                        isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                    children: [
-                      if (thoughtText.isNotEmpty)
-                        Theme(
-                          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                          child: ExpansionTile(
-                            initiallyExpanded: widget.isGenerating && index == displayHistory.length - 1,
-                            tilePadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 0.0),
-                            dense: true,
-                            visualDensity: VisualDensity.compact,
-                            collapsedShape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                              side: const BorderSide(color: AppColors.surfaceVariant),
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                              side: const BorderSide(color: AppColors.primary),
-                            ),
-                            backgroundColor: AppColors.surface,
-                            collapsedBackgroundColor: AppColors.surface,
-                            leading: const Icon(Icons.psychology, size: 16, color: AppColors.textSecondary),
-                            title: const Text(
-                              '> Thought',
-                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
-                            ),
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(left: 12.0, right: 12.0, bottom: 12.0),
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: _buildMarkdown(thoughtText, isUser),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      else if (!isUser && widget.isGenerating && widget.streamingText == rawContent)
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              '...',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              widget.workingStatus,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ],
+                    return Align(
+                      alignment: isUser
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 8.0),
+                        clipBehavior: Clip.hardEdge,
+                        decoration: BoxDecoration(
+                          color: isUser
+                              ? const Color(0xFF2A2A2A)
+                              : AppColors.surfaceVariant.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(6),
+                          border: isUser
+                              ? Border.all(color: Colors.transparent)
+                              : Border.all(color: AppColors.panelBorder),
                         ),
-
-                      if (!isUser && actions.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Theme(
-                            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                            child: ExpansionTile(
-                              tilePadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 0.0),
-                              dense: true,
-                              visualDensity: VisualDensity.compact,
-                              collapsedShape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                                side: const BorderSide(color: AppColors.surfaceVariant),
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                                side: const BorderSide(color: AppColors.primary),
-                              ),
-                              backgroundColor: AppColors.surface,
-                              collapsedBackgroundColor: AppColors.surface,
-                              leading: const Icon(Icons.auto_awesome, size: 16, color: AppColors.primary),
-                              title: Text(
-                                '> Executed ${actions.length} workspace action${actions.length > 1 ? 's' : ''}',
-                                style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
-                              ),
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 12.0, right: 12.0, bottom: 12.0),
-                                  child: Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Wrap(
-                                      spacing: 16.0,
-                                      runSpacing: 8.0,
-                                      children: () {
-                                        final counts = <String, Map<String, dynamic>>{};
-                                        for (final action in actions) {
-                                          final actionType = action['action_type'] as String? ?? 'unknown_action';
-                                          IconData iconData = Icons.build_circle_outlined;
-                                          String label = actionType;
-                                          if (actionType == 'inspect_canvas') {
-                                            iconData = Icons.search_rounded;
-                                            label = 'Inspected Canvas';
-                                          } else if (actionType == 'add_component') {
-                                            iconData = Icons.add_circle_outline;
-                                            label = 'Added Component';
-                                          } else if (actionType == 'update_component') {
-                                            iconData = Icons.edit_rounded;
-                                            label = 'Updated Component';
-                                          } else if (actionType == 'delete_element') {
-                                            iconData = Icons.delete_outline;
-                                            label = 'Deleted Element';
-                                          } else if (actionType == 'add_wire') {
-                                            iconData = Icons.timeline_rounded;
-                                            label = 'Added Wire';
-                                          }
-                                          if (!counts.containsKey(label)) {
-                                            counts[label] = {'count': 0, 'icon': iconData};
-                                          }
-                                          counts[label]!['count'] = (counts[label]!['count'] as int) + 1;
-                                        }
-                                        return counts.entries.map((entry) {
-                                          final label = entry.key;
-                                          final count = entry.value['count'] as int;
-                                          final iconData = entry.value['icon'] as IconData;
-                                          return Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(iconData, size: 14, color: AppColors.textSecondary),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                '${count}x $label',
-                                                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                                              ),
-                                            ],
-                                          );
-                                        }).toList();
-                                      }(),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: isUser
+                              ? null
+                              : const BoxDecoration(
+                                  border: Border(
+                                    left: BorderSide(
+                                      color: AppColors.primary,
+                                      width: 2,
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
+                          child: Column(
+                            crossAxisAlignment: isUser
+                                ? CrossAxisAlignment.end
+                                : CrossAxisAlignment.start,
+                            children: [
+                              if (thoughtText.isNotEmpty)
+                                Theme(
+                                  data: Theme.of(
+                                    context,
+                                  ).copyWith(dividerColor: Colors.transparent),
+                                  child: ExpansionTile(
+                                    initiallyExpanded:
+                                        widget.isGenerating &&
+                                        index == displayHistory.length - 1,
+                                    tilePadding: const EdgeInsets.symmetric(
+                                      horizontal: 12.0,
+                                      vertical: 0.0,
+                                    ),
+                                    dense: true,
+                                    visualDensity: VisualDensity.compact,
+                                    collapsedShape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                      side: const BorderSide(
+                                        color: AppColors.panelBorder,
+                                      ),
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                      side: const BorderSide(
+                                        color: AppColors.panelBorder,
+                                      ),
+                                    ),
+                                    backgroundColor: AppColors.surface,
+                                    collapsedBackgroundColor: AppColors.surface,
+                                    // leading: const Text('🧠', style: TextStyle(fontSize: 14)),
+                                    leading: const Icon(
+                                      Icons.psychology,
+                                      size: 16,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    title: Text(
+                                      'Thought',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          left: 12.0,
+                                          right: 12.0,
+                                          bottom: 12.0,
+                                        ),
+                                        child: Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: _buildMarkdown(
+                                            thoughtText,
+                                            isUser,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else if (!isUser &&
+                                  widget.isGenerating &&
+                                  widget.streamingText == rawContent)
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '...',
+                                      style: GoogleFonts.jetBrainsMono(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      widget.workingStatus,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 13,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                              if (!isUser && actions.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Theme(
+                                    data: Theme.of(context).copyWith(
+                                      dividerColor: Colors.transparent,
+                                    ),
+                                    child: ExpansionTile(
+                                      tilePadding: const EdgeInsets.symmetric(
+                                        horizontal: 12.0,
+                                        vertical: 0.0,
+                                      ),
+                                      dense: true,
+                                      visualDensity: VisualDensity.compact,
+                                      collapsedShape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                        side: const BorderSide(
+                                          color: AppColors.panelBorder,
+                                        ),
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                        side: const BorderSide(
+                                          color: AppColors.panelBorder,
+                                        ),
+                                      ),
+                                      backgroundColor: AppColors.surface,
+                                      collapsedBackgroundColor:
+                                          AppColors.surface,
+                                      // leading: const Text(
+                                      //   '✨',
+                                      //   style: TextStyle(fontSize: 14),
+                                      // ),
+                                      leading: const Icon(
+                                        Icons.auto_awesome,
+                                        size: 16,
+                                        color: AppColors.primary,
+                                      ),
+                                      title: Text(
+                                        'Executed ${actions.length} workspace action${actions.length > 1 ? 's' : ''}',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          color: AppColors.textPrimary,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      children: [
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            left: 12.0,
+                                            right: 12.0,
+                                            bottom: 12.0,
+                                          ),
+                                          child: Align(
+                                            alignment: Alignment.centerLeft,
+                                            child: Wrap(
+                                              spacing: 16.0,
+                                              runSpacing: 8.0,
+                                              children: () {
+                                                final counts =
+                                                    <
+                                                      String,
+                                                      Map<String, dynamic>
+                                                    >{};
+                                                for (final action in actions) {
+                                                  final actionType =
+                                                      action['action_type']
+                                                          as String? ??
+                                                      'unknown_action';
+                                                  IconData iconData = Icons
+                                                      .build_circle_outlined;
+                                                  String label = actionType;
+                                                  if (actionType ==
+                                                      'inspect_canvas') {
+                                                    iconData =
+                                                        Icons.search_rounded;
+                                                    label = 'Inspected Canvas';
+                                                  } else if (actionType ==
+                                                      'add_component') {
+                                                    iconData = Icons
+                                                        .add_circle_outline;
+                                                    label = 'Added Component';
+                                                  } else if (actionType ==
+                                                      'update_component') {
+                                                    iconData =
+                                                        Icons.edit_rounded;
+                                                    label = 'Updated Component';
+                                                  } else if (actionType ==
+                                                      'delete_element') {
+                                                    iconData =
+                                                        Icons.delete_outline;
+                                                    label = 'Deleted Element';
+                                                  } else if (actionType ==
+                                                      'add_wire') {
+                                                    iconData =
+                                                        Icons.timeline_rounded;
+                                                    label = 'Added Wire';
+                                                  }
+                                                  if (!counts.containsKey(
+                                                    label,
+                                                  )) {
+                                                    counts[label] = {
+                                                      'count': 0,
+                                                      'icon': iconData,
+                                                    };
+                                                  }
+                                                  counts[label]!['count'] =
+                                                      (counts[label]!['count']
+                                                          as int) +
+                                                      1;
+                                                }
+                                                return counts.entries.map((
+                                                  entry,
+                                                ) {
+                                                  final label = entry.key;
+                                                  final count =
+                                                      entry.value['count']
+                                                          as int;
+                                                  final iconData =
+                                                      entry.value['icon']
+                                                          as IconData;
+                                                  return Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        iconData,
+                                                        size: 14,
+                                                        color: AppColors
+                                                            .textSecondary,
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        '${count}x $label',
+                                                        style: GoogleFonts.inter(
+                                                          fontSize: 11,
+                                                          color: AppColors
+                                                              .textSecondary,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  );
+                                                }).toList();
+                                              }(),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              if (summaryText.isNotEmpty)
+                                Padding(
+                                  padding: EdgeInsets.only(
+                                    top:
+                                        (thoughtText.isNotEmpty ||
+                                                actions.isNotEmpty) &&
+                                            !isUser
+                                        ? 8.0
+                                        : 0.0,
+                                  ),
+                                  child: _buildMarkdown(summaryText, isUser),
+                                ),
+                              if (!isUser &&
+                                  (thoughtText.isNotEmpty ||
+                                      summaryText.isNotEmpty))
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: InkWell(
+                                    onTap: () {
+                                      final textToCopy = [
+                                        thoughtText,
+                                        summaryText,
+                                      ].where((t) => t.isNotEmpty).join('\n\n');
+                                      Clipboard.setData(
+                                        ClipboardData(text: textToCopy),
+                                      );
+                                      CustomSnackBar.show(
+                                        context,
+                                        message: 'Copied to clipboard',
+                                      );
+                                    },
+                                    child: const Padding(
+                                      padding: EdgeInsets.only(
+                                        top: 8.0,
+                                        left: 4.0,
+                                        right: 4.0,
+                                        bottom: 4.0,
+                                      ),
+                                      child: Icon(
+                                        Icons.copy_rounded,
+                                        size: 14,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                      if (summaryText.isNotEmpty)
-                        Padding(
-                          padding: EdgeInsets.only(top: (thoughtText.isNotEmpty || actions.isNotEmpty) && !isUser ? 8.0 : 0.0),
-                          child: _buildMarkdown(summaryText, isUser),
-                        ),
-                      if (!isUser && (thoughtText.isNotEmpty || summaryText.isNotEmpty))
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: InkWell(
-                            onTap: () {
-                              final textToCopy = [thoughtText, summaryText].where((t) => t.isNotEmpty).join('\n\n');
-                              Clipboard.setData(ClipboardData(text: textToCopy));
-                              CustomSnackBar.show(
-                                context,
-                                message: 'Copied to clipboard',
-                              );
-                            },
-                            child: const Padding(
-                              padding: EdgeInsets.only(top: 8.0, left: 4.0, right: 4.0, bottom: 4.0),
-                              child: Icon(
-                                Icons.copy_rounded,
-                                size: 14,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
-        ),
+              ),
             ),
           ),
         ),
         const Divider(height: 1),
-        if (widget.tokenUsage.isNotEmpty && (widget.tokenUsage['input']! > 0 || widget.tokenUsage['output']! > 0))
+        if (widget.tokenUsage.isNotEmpty &&
+            (widget.tokenUsage['input']! > 0 ||
+                widget.tokenUsage['output']! > 0))
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12.0,
+              vertical: 6.0,
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Icon(Icons.memory, size: 12, color: AppColors.textSecondary.withValues(alpha: 0.7)),
+                Icon(
+                  Icons.memory,
+                  size: 12,
+                  color: AppColors.textSecondary.withValues(alpha: 0.7),
+                ),
                 const SizedBox(width: 4),
                 Text(
                   'Input: ${widget.tokenUsage['input']} | Output: ${widget.tokenUsage['output']}',
-                  style: TextStyle(
+                  style: GoogleFonts.jetBrainsMono(
                     fontSize: 10,
                     color: AppColors.textSecondary.withValues(alpha: 0.7),
                   ),
@@ -550,39 +763,52 @@ class _IdeChatPanelState extends State<IdeChatPanel> {
               Expanded(
                 child: TextField(
                   controller: _controller,
-                  style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: AppColors.textPrimary,
+                  ),
                   decoration: InputDecoration(
                     hintText: 'Ask the IDE Agent...',
-                    hintStyle: const TextStyle(color: AppColors.textMuted),
+                    hintStyle: GoogleFonts.inter(color: AppColors.textMuted),
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 8,
                     ),
+                    filled: true,
+                    fillColor: AppColors.surfaceVariant.withValues(alpha: 0.5),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(4),
-                      borderSide: const BorderSide(color: AppColors.surfaceVariant),
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: const BorderSide(
+                        color: AppColors.panelBorder,
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(4),
-                      borderSide: const BorderSide(color: AppColors.surfaceVariant),
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: const BorderSide(
+                        color: AppColors.panelBorder,
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(20),
                       borderSide: const BorderSide(color: AppColors.primary),
                     ),
                   ),
-                  onSubmitted: widget.isGenerating ? null : (_) => _handleSend(),
+                  onSubmitted: widget.isGenerating
+                      ? null
+                      : (_) => _handleSend(),
                 ),
               ),
               const SizedBox(width: 8),
               IconButton(
                 onPressed: widget.isGenerating ? widget.onStop : _handleSend,
                 icon: Icon(
-                  widget.isGenerating ? Icons.stop_rounded : Icons.send_rounded, 
-                  size: 16
+                  widget.isGenerating ? Icons.stop_rounded : Icons.send_rounded,
+                  size: 16,
                 ),
-                color: widget.isGenerating ? AppColors.textPrimary : AppColors.primary,
+                color: widget.isGenerating
+                    ? AppColors.textPrimary
+                    : AppColors.primary,
                 splashRadius: 16,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
