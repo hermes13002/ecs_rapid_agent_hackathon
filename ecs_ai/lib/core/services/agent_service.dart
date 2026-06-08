@@ -77,6 +77,7 @@ class AgentService {
     List<CircuitComponent> components,
     List<CircuitWire> wires, {
     List<Map<String, String>> chatHistory = const [],
+    Map<String, dynamic>? simulationConfig,
   }) {
     if (!_isConnected || _channel == null) return;
 
@@ -84,6 +85,7 @@ class AgentService {
       components,
       wires,
       chatHistory: chatHistory,
+      simulationConfig: simulationConfig,
     );
     final payload = jsonEncode({'action': 'simulate', 'schematic': schematic});
 

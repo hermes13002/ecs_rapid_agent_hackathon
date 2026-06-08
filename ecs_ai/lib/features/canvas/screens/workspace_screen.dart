@@ -1,9 +1,6 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:vector_math/vector_math_64.dart' as v64;
 import 'package:ecs_ai/app/theme/app_colors.dart';
@@ -16,7 +13,6 @@ import 'package:ecs_ai/core/utils/id_generator.dart';
 import 'package:collection/collection.dart';
 import 'package:ecs_ai/core/services/agent_service.dart';
 import 'package:ecs_ai/core/services/wire_router_service.dart';
-import 'package:ecs_ai/shared/widgets/panel_container.dart';
 import 'package:ecs_ai/shared/widgets/custom_snackbar.dart';
 import 'package:ecs_ai/features/canvas/widgets/schematic_canvas.dart';
 import 'package:ecs_ai/features/canvas/widgets/properties_panel.dart';
@@ -49,7 +45,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   bool _isAiExpanded = true;
   bool _isSimulationExpanded = true;
   int _simulationTabIndex = 0; // 0 = Waveform, 1 = Component Values
-  String _componentSearchQuery = '';
+  final String _componentSearchQuery = '';
 
   late final TransformationController _transformationController;
   String _activeTool = 'SELECT';
@@ -67,8 +63,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   late final AgentService _agentService;
   late final IdeAgentService _ideAgentService;
   Timer? _debounceTimer;
-  Map<String, double> _nodeVoltages = {};
-  Map<String, Map<String, dynamic>> _componentMetrics = {};
+  final Map<String, double> _nodeVoltages = {};
+  final Map<String, Map<String, dynamic>> _componentMetrics = {};
+  final Map<String, List<double>> _timeSeriesData = {};
+  Map<String, dynamic> _simulationConfig = {'type': 'op'};
   double _bottomPanelHeight = AppConstants.bottomBarHeight;
   String _aiReasoningTokenStream = '';
   final List<Map<String, dynamic>> _aiChatHistory = [];
@@ -82,7 +80,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   bool _pendingToolResponse = false;
   final List<Map<String, dynamic>> _currentTurnActions = [];
   final ScrollController _simScrollController = ScrollController();
-  bool _hasDesignErrors = false;
+  final bool _hasDesignErrors = false;
 
   String _formatNodeKey(String key) {
     final parts = key.split(':');
@@ -112,8 +110,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
 
   double _rightSidebarWidth = AppConstants.sidebarWidth;
 
-  bool _showContextMenu = false;
-  Offset _contextMenuPosition = Offset.zero;
+  final bool _showContextMenu = false;
+  final Offset _contextMenuPosition = Offset.zero;
   String? _contextMenuComponentId;
 
   @override
@@ -141,6 +139,16 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     _agentService.simulationResults.listen((result) {
       if (!mounted) return;
       setState(() {
+        // parse Time-Series data (Transient/AC)
+        final timeSeries = result['time_series'] as Map<String, dynamic>?;
+        if (timeSeries != null) {
+          _timeSeriesData.clear();
+          for (final entry in timeSeries.entries) {
+            final list = entry.value as List<dynamic>? ?? [];
+            _timeSeriesData[entry.key] = list.map((e) => (e as num).toDouble()).toList();
+          }
+        }
+
         final nets = result['nets'] as List<dynamic>?;
         if (nets != null) {
           _nodeVoltages.clear();
@@ -168,6 +176,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
               }
             }
           }
+          _simulationStatus = 'Simulated';
+        } else if (timeSeries != null) {
+          // if we got time series data but no net voltages, still mark as simulated
           _simulationStatus = 'Simulated';
         }
       });
@@ -339,15 +350,24 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     _transformationController.value = Matrix4.identity()..translate(tx, ty);
   }
 
-  void _scheduleSimulation() {
+  void _scheduleSimulation({bool isManual = false}) {
+    if (!isManual && _simulationConfig['type'] != 'op') {
+      return;
+    }
+
     setState(() {
       _simulationStatus = 'Simulating...';
       _nodeVoltages.clear();
       _componentMetrics.clear();
+      _timeSeriesData.clear();
     });
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-      _agentService.simulate(_components, _wires);
+      _agentService.simulate(
+        _components, 
+        _wires,
+        simulationConfig: _simulationConfig,
+      );
     });
   }
 
@@ -1270,6 +1290,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                       simulationTabIndex: _simulationTabIndex,
                       componentMetrics: _componentMetrics,
                       components: _components,
+                      timeSeriesData: _timeSeriesData,
                       hoveredComponentId: _hoveredComponentId,
                       onTabChanged: (index) =>
                           setState(() => _simulationTabIndex = index),
@@ -1283,17 +1304,30 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                   simulationStatus: _simulationStatus,
                   isSimulationExpanded: _isSimulationExpanded,
                   hasDesignErrors: _hasDesignErrors,
+                  simulationConfig: _simulationConfig,
+                  onConfigChanged: (config) {
+                    setState(() {
+                      _simulationConfig = config;
+                      // if user selects tran or ac, automatically expand the panel to show graphs
+                      if (config['type'] == 'tran' || config['type'] == 'ac') {
+                        _isSimulationExpanded = true;
+                        _simulationTabIndex = 0; // Waveform Graph tab
+                      }
+                    });
+                    _scheduleSimulation(isManual: config['type'] != 'op');
+                  },
                   onStop: () {
                     _debounceTimer?.cancel();
                     setState(() {
                       _simulationStatus = 'Ready';
                       _nodeVoltages.clear();
                       _componentMetrics.clear();
+                      _timeSeriesData.clear();
                     });
                   },
                   onRun: () {
                     setState(() => _isSimulationExpanded = true);
-                    _scheduleSimulation();
+                    _scheduleSimulation(isManual: true);
                   },
                   onToggleExpand: () => setState(
                     () => _isSimulationExpanded = !_isSimulationExpanded,

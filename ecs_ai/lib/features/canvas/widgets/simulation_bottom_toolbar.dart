@@ -8,6 +8,8 @@ class SimulationBottomToolbar extends StatelessWidget {
   final VoidCallback onRun;
   final VoidCallback onToggleExpand;
   final bool hasDesignErrors;
+  final Map<String, dynamic> simulationConfig;
+  final ValueChanged<Map<String, dynamic>> onConfigChanged;
 
   const SimulationBottomToolbar({
     super.key,
@@ -17,6 +19,8 @@ class SimulationBottomToolbar extends StatelessWidget {
     required this.onRun,
     required this.onToggleExpand,
     this.hasDesignErrors = false,
+    required this.simulationConfig,
+    required this.onConfigChanged,
   });
 
   @override
@@ -83,6 +87,35 @@ class SimulationBottomToolbar extends StatelessWidget {
             ),
             const SizedBox(width: 12),
           ],
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: simulationConfig['type'] as String? ?? 'op',
+              dropdownColor: AppColors.surfaceVariant,
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              icon: const Icon(Icons.arrow_drop_down, color: Colors.white, size: 16),
+              isDense: true,
+              items: const [
+                DropdownMenuItem(value: 'op', child: Text('OP')),
+                DropdownMenuItem(value: 'tran', child: Text('TRANSIENT')),
+                DropdownMenuItem(value: 'ac', child: Text('AC SWEEP')),
+              ],
+              onChanged: (val) {
+                if (val != null) {
+                  final newConfig = {'type': val};
+                  if (val == 'tran') {
+                    newConfig['step'] = '1ms';
+                    newConfig['stop'] = '100ms';
+                  } else if (val == 'ac') {
+                    newConfig['dec'] = '10';
+                    newConfig['start'] = '1';
+                    newConfig['stop'] = '100k';
+                  }
+                  onConfigChanged(newConfig);
+                }
+              },
+            ),
+          ),
+          const SizedBox(width: 12),
           MouseRegion(
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
@@ -99,7 +132,7 @@ class SimulationBottomToolbar extends StatelessWidget {
                     Icon(Icons.play_arrow, color: Colors.black, size: 16),
                     SizedBox(width: 6),
                     Text(
-                      'RUN SIMULATION',
+                      'RUN',
                       style: TextStyle(
                         color: Colors.black,
                         fontSize: 12,

@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:ecs_ai/app/theme/app_colors.dart';
 import 'package:ecs_ai/core/constants/app_constants.dart';
 import 'package:ecs_ai/core/models/circuit_component.dart';
-import 'package:ecs_ai/features/canvas/painters/waveform_painter.dart';
 import 'package:collection/collection.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class SimulationPanel extends StatelessWidget {
   final int simulationTabIndex;
   final Map<String, Map<String, dynamic>> componentMetrics;
   final List<CircuitComponent> components;
+  final Map<String, List<double>>? timeSeriesData;
   final String? hoveredComponentId;
   final Function(int) onTabChanged;
   final Function(String?) onHoverComponent;
@@ -18,6 +19,7 @@ class SimulationPanel extends StatelessWidget {
     required this.simulationTabIndex,
     required this.componentMetrics,
     required this.components,
+    this.timeSeriesData,
     required this.hoveredComponentId,
     required this.onTabChanged,
     required this.onHoverComponent,
@@ -72,17 +74,163 @@ class SimulationPanel extends StatelessWidget {
   }
 
   Widget _buildWaveformTab() {
+    final hasData = timeSeriesData != null && timeSeriesData!.isNotEmpty && timeSeriesData!.containsKey('time');
+    
+    // We will define a list of vibrant colors for the waveforms
+    final waveformColors = [
+      Colors.cyan,
+      Colors.amber,
+      Colors.redAccent,
+      Colors.greenAccent,
+      Colors.purpleAccent,
+      Colors.orangeAccent,
+    ];
+
+    List<LineChartBarData> lineBars = [];
+    List<Widget> legendItems = [];
+    double minX = 0, maxX = 0, minY = double.infinity, maxY = double.negativeInfinity;
+
+    if (hasData) {
+      final timeArray = timeSeriesData!['time']!;
+      if (timeArray.isNotEmpty) {
+        minX = timeArray.first;
+        maxX = timeArray.last;
+      }
+
+      int colorIndex = 0;
+      for (final entry in timeSeriesData!.entries) {
+        if (entry.key == 'time') continue;
+
+        final voltages = entry.value;
+        List<FlSpot> spots = [];
+        
+        for (int i = 0; i < timeArray.length && i < voltages.length; i++) {
+          spots.add(FlSpot(timeArray[i], voltages[i]));
+          if (voltages[i] < minY) minY = voltages[i];
+          if (voltages[i] > maxY) maxY = voltages[i];
+        }
+
+        final color = waveformColors[colorIndex % waveformColors.length];
+        
+        lineBars.add(
+          LineChartBarData(
+            spots: spots,
+            isCurved: false,
+            color: color,
+            barWidth: 1.5,
+            isStrokeCapRound: true,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(show: false),
+          ),
+        );
+
+        legendItems.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildLegendItem(entry.key, color),
+          )
+        );
+
+        colorIndex++;
+      }
+    }
+
+    // Add a bit of padding to Y axis
+    if (minY == double.infinity) minY = -1;
+    if (maxY == double.negativeInfinity) maxY = 1;
+    final yRange = maxY - minY;
+    final yPadding = yRange == 0 ? 1.0 : yRange * 0.1;
+    minY -= yPadding;
+    maxY += yPadding;
+
     return Stack(
       children: [
         Row(
           children: [
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: CustomPaint(
-                  painter: WaveformPainter(),
-                  child: Container(),
-                ),
+                padding: const EdgeInsets.all(24.0),
+                child: hasData 
+                ? LineChart(
+                    LineChartData(
+                      lineBarsData: lineBars,
+                      minX: minX,
+                      maxX: maxX,
+                      minY: minY,
+                      maxY: maxY,
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: true,
+                        horizontalInterval: yRange > 0 ? (yRange / 5).clamp(0.01, double.infinity) : 1,
+                        getDrawingHorizontalLine: (value) => FlLine(
+                          color: AppColors.panelBorder.withValues(alpha: 0.5),
+                          strokeWidth: 1,
+                        ),
+                        getDrawingVerticalLine: (value) => FlLine(
+                          color: AppColors.panelBorder.withValues(alpha: 0.5),
+                          strokeWidth: 1,
+                        ),
+                      ),
+                      titlesData: FlTitlesData(
+                        show: true,
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 30,
+                            interval: (maxX - minX) > 0 ? ((maxX - minX) / 5) : 1,
+                            getTitlesWidget: (value, meta) {
+                              return SideTitleWidget(
+                                meta: meta,
+                                child: Text(
+                                  '${(value * 1000).toStringAsFixed(1)}ms',
+                                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            interval: yRange > 0 ? (yRange / 5).clamp(0.01, double.infinity) : 1,
+                            getTitlesWidget: (value, meta) {
+                              return Text(
+                                '${value.toStringAsFixed(1)}V',
+                                style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
+                                textAlign: TextAlign.right,
+                              );
+                            },
+                            reservedSize: 40,
+                          ),
+                        ),
+                      ),
+                      borderData: FlBorderData(
+                        show: true,
+                        border: Border.all(color: AppColors.panelBorder),
+                      ),
+                      lineTouchData: LineTouchData(
+                        touchTooltipData: LineTouchTooltipData(
+                          getTooltipItems: (touchedSpots) {
+                            return touchedSpots.map((spot) {
+                              return LineTooltipItem(
+                                '${spot.y.toStringAsFixed(3)}V\n@ ${(spot.x * 1000).toStringAsFixed(2)}ms',
+                                const TextStyle(color: Colors.white, fontSize: 12),
+                              );
+                            }).toList();
+                          },
+                        ),
+                      ),
+                    ),
+                  )
+                : const Center(
+                    child: Text(
+                      'No Time-Series Data Available.\nRun a Transient Simulation.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                    ),
+                  ),
               ),
             ),
             Container(
@@ -96,39 +244,13 @@ class SimulationPanel extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildLegendItem('Input Signal', Colors.cyan),
-                  const SizedBox(height: 12),
-                  _buildLegendItem('Filtered Output', Colors.amber),
-                  const SizedBox(height: 12),
-                  _buildLegendItem('Control Voltage', Colors.redAccent),
+                  const Text('NETS', style: TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                  const SizedBox(height: 16),
+                  if (legendItems.isNotEmpty) ...legendItems else const Text('No Nets', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
                 ],
               ),
             ),
           ],
-        ),
-        // Coming Soon Overlay
-        Positioned.fill(
-          child: Container(
-            color: Colors.black.withValues(alpha: 0.6),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.panelBorder),
-                ),
-                child: const Text(
-                  'Live Waveform Data Coming Soon',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.1,
-                  ),
-                ),
-              ),
-            ),
-          ),
         ),
       ],
     );
