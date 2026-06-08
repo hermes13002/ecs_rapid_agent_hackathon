@@ -9,8 +9,8 @@ import 'package:ecs_ai/core/constants/app_constants.dart';
 
 class IdeAgentService {
   IdeAgentService({
-    this.baseUrl = ApiConstants.baseUrl, 
-    this.wsUrl = ApiConstants.wsUrl
+    this.baseUrl = ApiConstants.baseUrl,
+    this.wsUrl = ApiConstants.wsUrl,
   });
 
   final String baseUrl;
@@ -21,7 +21,8 @@ class IdeAgentService {
   final _reasoningController = StreamController<String>.broadcast();
   final _actionController = StreamController<Map<String, dynamic>>.broadcast();
   final _errorController = StreamController<String>.broadcast();
-  final _sessionMetadataController = StreamController<Map<String, dynamic>>.broadcast();
+  final _sessionMetadataController =
+      StreamController<Map<String, dynamic>>.broadcast();
   final _statusController = StreamController<bool>.broadcast();
   final _chatIntentController = StreamController<String>.broadcast();
   final _errorsController = StreamController<String>.broadcast();
@@ -30,7 +31,8 @@ class IdeAgentService {
   Stream<String> get agentReasoning => _reasoningController.stream;
   Stream<Map<String, dynamic>> get agentActions => _actionController.stream;
   Stream<String> get errors => _errorsController.stream;
-  Stream<Map<String, dynamic>> get sessionCreated => _sessionMetadataController.stream;
+  Stream<Map<String, dynamic>> get sessionCreated =>
+      _sessionMetadataController.stream;
   Stream<bool> get isGenerating => _statusController.stream;
   Stream<String> get chatIntent => _chatIntentController.stream;
   Stream<Map<String, int>> get tokenUsage => _tokenUsageController.stream;
@@ -50,7 +52,9 @@ class IdeAgentService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final sessionsRaw = data['sessions'] as List<dynamic>? ?? [];
-        return sessionsRaw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        return sessionsRaw
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
       }
     } catch (e) {
       debugPrint('Failed to fetch sessions: $e');
@@ -58,7 +62,9 @@ class IdeAgentService {
     return [];
   }
 
-  Future<List<Map<String, String>>> fetchSessionHistory(String sessionId) async {
+  Future<List<Map<String, String>>> fetchSessionHistory(
+    String sessionId,
+  ) async {
     try {
       final token = await AuthService.getToken();
       if (token == null) return [];
@@ -71,7 +77,9 @@ class IdeAgentService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final historyRaw = data['history'] as List<dynamic>? ?? [];
-        return historyRaw.map((e) => Map<String, String>.from(e as Map)).toList();
+        return historyRaw
+            .map((e) => Map<String, String>.from(e as Map))
+            .toList();
       }
     } catch (e) {
       debugPrint('Failed to fetch session history: $e');
@@ -83,8 +91,10 @@ class IdeAgentService {
     if (_isConnected) return;
     try {
       final token = await AuthService.getToken();
-      final uri = token != null ? '$wsUrl/ws/ide?token=$token' : '$wsUrl/ws/ide';
-      
+      final uri = token != null
+          ? '$wsUrl/ws/ide?token=$token'
+          : '$wsUrl/ws/ide';
+
       _channel = WebSocketChannel.connect(Uri.parse(uri));
       await _channel!.ready;
       _isConnected = true;
@@ -107,7 +117,11 @@ class IdeAgentService {
     }
   }
 
-  void sendPrompt(String prompt, Map<String, dynamic> canvasContext, {String? sessionId}) {
+  void sendPrompt(
+    String prompt,
+    Map<String, dynamic> canvasContext, {
+    String? sessionId,
+  }) {
     if (!_isConnected || _channel == null) return;
     _statusController.add(true);
     final payload = jsonEncode({
@@ -152,12 +166,12 @@ class IdeAgentService {
       }
 
       final action = data['action'] as String?;
-      
+
       if (action == 'ide_chat_complete') {
         _statusController.add(false);
         return;
       }
-      
+
       if (action == 'session_created') {
         _sessionMetadataController.add({
           'id': data['session_id'],
@@ -165,7 +179,7 @@ class IdeAgentService {
         });
         return;
       }
-      
+
       if (action == 'chat_intent') {
         _chatIntentController.add(data['intent'] as String? ?? 'Thinking');
         return;
@@ -174,15 +188,12 @@ class IdeAgentService {
       if (action == 'token_usage') {
         final total = data['session_total'];
         if (total is Map) {
-           _tokenUsageController.add({
-              'input': total['input'] as int? ?? 0,
-              'output': total['output'] as int? ?? 0,
-           });
+          _tokenUsageController.add({
+            'input': total['input'] as int? ?? 0,
+            'output': total['output'] as int? ?? 0,
+          });
         } else if (total is int) {
-           _tokenUsageController.add({
-              'input': 0,
-              'output': total,
-           });
+          _tokenUsageController.add({'input': 0, 'output': total});
         }
         return;
       }
@@ -201,30 +212,31 @@ class IdeAgentService {
   void _parseAndDispatchTokens(String token) {
     _reasoningController.add(token);
     _buffer += token;
-    
+
     final regex = RegExp(r'```json\n(.*?)\n```', dotAll: true);
     final matches = regex.allMatches(_buffer);
-    
+
     for (final match in matches) {
       final jsonBlock = match.group(1);
       if (jsonBlock != null) {
         try {
-            final lines = jsonBlock.split('\n');
-            for (final line in lines) {
-                if (line.trim().isEmpty) continue;
-                final parsed = jsonDecode(line.trim());
-                if (parsed is Map<String, dynamic> && parsed.containsKey('action_type')) {
-                    _actionController.add(parsed);
-                }
+          final lines = jsonBlock.split('\n');
+          for (final line in lines) {
+            if (line.trim().isEmpty) continue;
+            final parsed = jsonDecode(line.trim());
+            if (parsed is Map<String, dynamic> &&
+                parsed.containsKey('action_type')) {
+              _actionController.add(parsed);
             }
-        } catch(e) {
-            debugPrint('Failed to parse json block: $e');
+          }
+        } catch (e) {
+          debugPrint('Failed to parse json block: $e');
         }
       }
     }
-    
+
     if (matches.isNotEmpty) {
-       _buffer = _buffer.substring(matches.last.end);
+      _buffer = _buffer.substring(matches.last.end);
     }
   }
 

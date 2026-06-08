@@ -112,6 +112,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
 
   double _rightSidebarWidth = AppConstants.sidebarWidth;
 
+  bool _showContextMenu = false;
+  Offset _contextMenuPosition = Offset.zero;
+  String? _contextMenuComponentId;
+
   @override
   void initState() {
     super.initState();
@@ -813,41 +817,63 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                         color: AppColors.surfaceVariant,
                         child: Column(
                           children: [
-                            const SizedBox(height: 8),
-                            IconButton(
-                              tooltip: 'Components',
-                              icon: const Icon(Icons.category_outlined),
-                              color: _leftPanelTabIndex == 0
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                              onPressed: () {
-                                setState(() {
-                                  if (_leftPanelTabIndex == 0) {
-                                    _isLeftPanelOpen = !_isLeftPanelOpen;
-                                  } else {
-                                    _leftPanelTabIndex = 0;
-                                    _isLeftPanelOpen = true;
-                                  }
-                                });
-                              },
+                            const SizedBox(height: 16),
+                            Tooltip(
+                              message: 'Component Library',
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    if (_leftPanelTabIndex == 0) {
+                                      _isLeftPanelOpen = !_isLeftPanelOpen;
+                                    } else {
+                                      _leftPanelTabIndex = 0;
+                                      _isLeftPanelOpen = true;
+                                    }
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(4),
+                                child: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: _leftPanelTabIndex == 0 ? Colors.white : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Icon(
+                                    Icons.category_outlined,
+                                    color: _leftPanelTabIndex == 0 ? Colors.black : AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
                             ),
-                            const SizedBox(height: 4),
-                            IconButton(
-                              tooltip: 'Properties',
-                              icon: const Icon(Icons.tune_outlined),
-                              color: _leftPanelTabIndex == 1
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                              onPressed: () {
-                                setState(() {
-                                  if (_leftPanelTabIndex == 1) {
-                                    _isLeftPanelOpen = !_isLeftPanelOpen;
-                                  } else {
-                                    _leftPanelTabIndex = 1;
-                                    _isLeftPanelOpen = true;
-                                  }
-                                });
-                              },
+                            const SizedBox(height: 8),
+                            Tooltip(
+                              message: 'Properties',
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    if (_leftPanelTabIndex == 1) {
+                                      _isLeftPanelOpen = !_isLeftPanelOpen;
+                                    } else {
+                                      _leftPanelTabIndex = 1;
+                                      _isLeftPanelOpen = true;
+                                    }
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(4),
+                                child: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: _leftPanelTabIndex == 1 ? Colors.white : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Icon(
+                                    Icons.tune_outlined,
+                                    color: _leftPanelTabIndex == 1 ? Colors.black : AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -874,8 +900,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                 child: _leftPanelTabIndex == 0
                                     ? ComponentLibraryPanel(
                                         activeTool: _activeTool,
-                                        onSelectComponent:
-                                            _selectComponentToPlace,
+                                        onSelectComponent: _selectComponentToPlace,
                                       )
                                     : _buildPropertiesPanel(),
                               )
@@ -949,22 +974,25 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                       onHorizontalDragUpdate: (details) {
                                         setState(() {
                                           _rightSidebarWidth =
-                                              (_rightSidebarWidth -
-                                                      details.delta.dx)
+                                              (_rightSidebarWidth - details.delta.dx)
                                                   .clamp(200.0, 600.0);
                                         });
                                       },
                                       child: Container(
-                                        width: 4,
-                                        color: Colors.transparent,
+                                        width: 8,
+                                        decoration: const BoxDecoration(
+                                          color: Colors.transparent,
+                                          border: Border(
+                                            left: BorderSide(color: AppColors.panelBorder, width: 1),
+                                          ),
+                                        ),
                                         child: Center(
                                           child: Container(
-                                            width: 2,
-                                            height: 20,
+                                            width: 3,
+                                            height: 36,
                                             decoration: BoxDecoration(
-                                              color: AppColors.surfaceVariant,
-                                              borderRadius:
-                                                  BorderRadius.circular(2),
+                                              color: AppColors.textSecondary.withValues(alpha: 0.5),
+                                              borderRadius: BorderRadius.circular(1.5),
                                             ),
                                           ),
                                         ),
@@ -978,8 +1006,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                           CrossAxisAlignment.stretch,
                                       children: [
                                         Container(
-                                          height:
-                                              AppConstants.panelHeaderHeight,
+                                          height: 32,
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 16,
                                           ),
@@ -988,8 +1015,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                             children: [
                                               const Icon(
                                                 Icons.smart_toy_outlined,
-                                                size: 16,
-                                                color: AppColors.textPrimary,
+                                                size: 14,
+                                                color: AppColors.textSecondary,
                                               ),
                                               const SizedBox(width: 8),
                                               Expanded(
@@ -1001,32 +1028,168 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                                       .textTheme
                                                       .labelMedium
                                                       ?.copyWith(
-                                                        letterSpacing: 1.2,
+                                                        letterSpacing: 1.0,
                                                         fontWeight: FontWeight.w600,
-                                                        color: AppColors.textPrimary,
+                                                        color: AppColors.textSecondary,
+                                                        fontSize: 11,
                                                       ),
                                                 ),
                                               ),
-                                              const SizedBox(width: 16),
-                                              InkWell(
-                                                onTap: () => setState(() => _isAiExpanded = false),
-                                                child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: const [
-                                                    Text(
-                                                      'Close',
-                                                      style: TextStyle(
-                                                        color: AppColors.textSecondary,
-                                                        fontSize: 12,
-                                                      ),
-                                                    ),
-                                                    SizedBox(width: 4),
-                                                    Icon(
+                                              const SizedBox(width: 8),
+                                              Tooltip(
+                                                message: 'New Chat',
+                                                child: InkWell(
+                                                  onTap: () {
+                                                    setState(() {
+                                                      _activeSessionId = null;
+                                                      _aiChatHistory.clear();
+                                                      _aiReasoningTokenStream = '';
+                                                    });
+                                                  },
+                                                  borderRadius: BorderRadius.zero,
+                                                  child: const Padding(
+                                                    padding: EdgeInsets.all(4.0),
+                                                    child: Icon(Icons.add, size: 14, color: AppColors.textSecondary),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Tooltip(
+                                                message: 'Chat History',
+                                                child: InkWell(
+                                                  onTap: () {
+                                                    showDialog(
+                                                      context: context,
+                                                      builder: (context) {
+                                                        String searchQuery = '';
+                                                        return StatefulBuilder(
+                                                          builder: (context, setStateDialog) {
+                                                            final filteredSessions = _chatSessions.where((s) {
+                                                              final title = (s['title'] as String? ?? 'Conversation').toLowerCase();
+                                                              return title.contains(searchQuery.toLowerCase());
+                                                            }).toList();
+
+                                                            return AlertDialog(
+                                                              backgroundColor: AppColors.surface,
+                                                              shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                                                              title: Text(
+                                                                'Chat History',
+                                                                style: GoogleFonts.inter(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600),
+                                                              ),
+                                                              content: Container(
+                                                                width: 500,
+                                                                constraints: const BoxConstraints(maxHeight: 500),
+                                                                child: Column(
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  children: [
+                                                                    TextField(
+                                                                      onChanged: (val) => setStateDialog(() => searchQuery = val),
+                                                                      style: GoogleFonts.inter(color: AppColors.textPrimary, fontSize: 13),
+                                                                      cursorColor: Colors.white,
+                                                                      decoration: InputDecoration(
+                                                                        hintText: 'Search history...',
+                                                                        hintStyle: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13),
+                                                                        prefixIcon: const Icon(Icons.search, size: 16, color: AppColors.textSecondary),
+                                                                        filled: true,
+                                                                        fillColor: AppColors.background,
+                                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                                                        border: const OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide.none),
+                                                                        focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: Colors.white, width: 1)),
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(height: 16),
+                                                                    Expanded(
+                                                                      child: filteredSessions.isEmpty
+                                                                          ? Center(
+                                                                              child: Text('No matching sessions', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13)),
+                                                                            )
+                                                                          : ListView.separated(
+                                                                              shrinkWrap: true,
+                                                                              itemCount: filteredSessions.length,
+                                                                              separatorBuilder: (context, index) => const Divider(height: 1, color: AppColors.panelBorder),
+                                                                              itemBuilder: (context, index) {
+                                                                                final session = filteredSessions[index];
+                                                                                final isActive = session['id'] == _activeSessionId;
+                                                                                return StatefulBuilder(
+                                                                                  builder: (context, setTileState) {
+                                                                                    bool isHovered = false;
+                                                                                    final isWhiteBg = isActive || isHovered;
+                                                                                    return MouseRegion(
+                                                                                      onEnter: (_) => setTileState(() => isHovered = true),
+                                                                                      onExit: (_) => setTileState(() => isHovered = false),
+                                                                                      cursor: SystemMouseCursors.click,
+                                                                                      child: GestureDetector(
+                                                                                        onTap: () {
+                                                                                          Navigator.of(context).pop();
+                                                                                          setState(() => _activeSessionId = session['id'] as String?);
+                                                                                          if (session['id'] != null) {
+                                                                                            _loadSessionHistory(session['id'] as String);
+                                                                                          }
+                                                                                        },
+                                                                                        child: Container(
+                                                                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                                                                          decoration: BoxDecoration(
+                                                                                            color: isWhiteBg ? Colors.white : Colors.transparent,
+                                                                                            borderRadius: BorderRadius.zero,
+                                                                                          ),
+                                                                                          child: Text(
+                                                                                            session['title'] as String? ?? 'Conversation',
+                                                                                            style: GoogleFonts.inter(
+                                                                                              color: isWhiteBg ? Colors.black : AppColors.textPrimary,
+                                                                                              fontSize: 13,
+                                                                                              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                                                                                            ),
+                                                                                            maxLines: 1,
+                                                                                            overflow: TextOverflow.ellipsis,
+                                                                                          ),
+                                                                                        ),
+                                                                                      ),
+                                                                                    );
+                                                                                  },
+                                                                                );
+                                                                              },
+                                                                            ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                              actions: [
+                                                                TextButton(
+                                                                  style: TextButton.styleFrom(
+                                                                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                                                                    foregroundColor: AppColors.textSecondary,
+                                                                  ),
+                                                                  onPressed: () => Navigator.of(context).pop(),
+                                                                  child: const Text('Close'),
+                                                                ),
+                                                              ],
+                                                            );
+                                                          },
+                                                        );
+                                                      },
+                                                    );
+                                                  },
+                                                  borderRadius: BorderRadius.zero,
+                                                  child: const Padding(
+                                                    padding: EdgeInsets.all(4.0),
+                                                    child: Icon(Icons.history, size: 14, color: AppColors.textSecondary),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Tooltip(
+                                                message: 'Close Panel',
+                                                child: InkWell(
+                                                  onTap: () => setState(() => _isAiExpanded = false),
+                                                  borderRadius: BorderRadius.zero,
+                                                  child: const Padding(
+                                                    padding: EdgeInsets.all(4.0),
+                                                    child: Icon(
                                                       Icons.close,
-                                                      size: 16,
+                                                      size: 14,
                                                       color: AppColors.textSecondary,
                                                     ),
-                                                  ],
+                                                  ),
                                                 ),
                                               ),
                                             ],
@@ -1165,7 +1328,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
             Positioned(
               left: (_isLeftPanelOpen ? AppConstants.sidebarWidth : 0) + 60,
               top: 0,
-              bottom: 0,
+              bottom: _isSimulationExpanded ? _bottomPanelHeight + 48 : 44,
               child: Center(
                 child: FloatingToolbar(
                   activeTool: _activeTool,

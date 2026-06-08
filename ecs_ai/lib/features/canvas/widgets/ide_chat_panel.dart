@@ -137,7 +137,7 @@ class _IdeChatPanelState extends State<IdeChatPanel> {
         p: GoogleFonts.inter(fontSize: 12, color: AppColors.textPrimary),
         code: GoogleFonts.jetBrainsMono(
           fontSize: 12,
-          color: AppColors.primary,
+          color: Colors.white,
           backgroundColor: AppColors.surface,
         ),
         codeblockDecoration: BoxDecoration(
@@ -217,115 +217,6 @@ class _IdeChatPanelState extends State<IdeChatPanel> {
 
     return Column(
       children: [
-        // --- Header for Chat Sessions ---
-        Container(
-          height: 40,
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: AppColors.divider)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: widget.onNewChat,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(
-                          color: widget.activeSessionId == null
-                              ? AppColors.primary
-                              : Colors.transparent,
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.add,
-                          size: 16,
-                          color: widget.activeSessionId == null
-                              ? AppColors.primary
-                              : AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'New Chat',
-                          style: GoogleFonts.inter(
-                            color: widget.activeSessionId == null
-                                ? AppColors.primary
-                                : AppColors.textSecondary,
-                            fontSize: 13,
-                            fontWeight: widget.activeSessionId == null
-                                ? FontWeight.w600
-                                : FontWeight.normal,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: PopupMenuButton<String>(
-                  color: AppColors.surface,
-                  offset: const Offset(0, 40),
-                  tooltip: 'Chat History',
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.history,
-                        size: 16,
-                        color: AppColors.textSecondary,
-                      ),
-                      SizedBox(width: 6),
-                      Text(
-                        'History',
-                        style: GoogleFonts.inter(
-                          color: AppColors.textSecondary,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                  itemBuilder: (context) {
-                    if (widget.chatSessions.isEmpty) {
-                      return [
-                        PopupMenuItem<String>(
-                          enabled: false,
-                          child: Text(
-                            'No previous sessions',
-                            style: GoogleFonts.inter(
-                              color: AppColors.textSecondary,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ];
-                    }
-                    return widget.chatSessions.map((session) {
-                      return PopupMenuItem<String>(
-                        value: session['id'] as String?,
-                        child: Text(
-                          session['title'] as String? ?? 'Conversation',
-                          style: GoogleFonts.inter(
-                            color: AppColors.textPrimary,
-                            fontSize: 13,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }).toList();
-                  },
-                  onSelected: widget.onSessionSelected,
-                ),
-              ),
-            ],
-          ),
-        ),
         Expanded(
           child: Listener(
             onPointerSignal: (event) {
@@ -423,7 +314,7 @@ class _IdeChatPanelState extends State<IdeChatPanel> {
                               : const BoxDecoration(
                                   border: Border(
                                     left: BorderSide(
-                                      color: AppColors.primary,
+                                      color: Colors.white,
                                       width: 2,
                                     ),
                                   ),
@@ -555,7 +446,7 @@ class _IdeChatPanelState extends State<IdeChatPanel> {
                                       leading: const Icon(
                                         Icons.auto_awesome,
                                         size: 16,
-                                        color: AppColors.primary,
+                                        color: Colors.white,
                                       ),
                                       title: Text(
                                         'Executed ${actions.length} workspace action${actions.length > 1 ? 's' : ''}',
@@ -791,7 +682,7 @@ class _IdeChatPanelState extends State<IdeChatPanel> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(20),
-                      borderSide: const BorderSide(color: AppColors.primary),
+                      borderSide: const BorderSide(color: Colors.white),
                     ),
                   ),
                   onSubmitted: widget.isGenerating
@@ -808,7 +699,7 @@ class _IdeChatPanelState extends State<IdeChatPanel> {
                 ),
                 color: widget.isGenerating
                     ? AppColors.textPrimary
-                    : AppColors.primary,
+                    : Colors.white,
                 splashRadius: 16,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),

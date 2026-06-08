@@ -31,7 +31,7 @@ class SimulationPanel extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.textPrimary : Colors.transparent,
+          color: isSelected ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(4),
         ),
         child: Text(
@@ -39,7 +39,7 @@ class SimulationPanel extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            color: isSelected ? AppColors.surface : AppColors.textSecondary,
+            color: isSelected ? Colors.black : AppColors.textSecondary,
           ),
         ),
       ),

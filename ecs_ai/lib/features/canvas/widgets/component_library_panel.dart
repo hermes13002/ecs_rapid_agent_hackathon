@@ -30,10 +30,11 @@ class _ComponentLibraryPanelState extends State<ComponentLibraryPanel> {
         onTap: () => widget.onSelectComponent(type),
         hoverColor: AppColors.surfaceVariant.withValues(alpha: 0.5),
         child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary : Colors.transparent,
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.zero,
           ),
           child: Row(
             children: [
@@ -46,13 +47,13 @@ class _ComponentLibraryPanelState extends State<ComponentLibraryPanel> {
                   BlendMode.srcIn,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Text(
                   type.label,
                   style: GoogleFonts.inter(
                     color: isSelected ? Colors.black : AppColors.textPrimary,
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                   ),
                 ),
@@ -74,10 +75,10 @@ class _ComponentLibraryPanelState extends State<ComponentLibraryPanel> {
     }
 
     return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 0),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       children: grouped.entries.map((entry) {
         String catName = entry.key.name;
-        catName = catName[0].toUpperCase() + catName.substring(1) + ' Components';
+        catName = catName[0].toUpperCase() + catName.substring(1).toLowerCase() + ' Components';
         
         return Theme(
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -86,12 +87,13 @@ class _ComponentLibraryPanelState extends State<ComponentLibraryPanel> {
             controlAffinity: ListTileControlAffinity.leading,
             iconColor: AppColors.textSecondary,
             collapsedIconColor: AppColors.textSecondary,
-            tilePadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+            tilePadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
             title: Text(
-              catName,
+              catName.toUpperCase(),
               style: GoogleFonts.inter(
-                color: AppColors.textPrimary,
-                fontSize: 12,
+                color: AppColors.textSecondary,
+                fontSize: 10,
+                letterSpacing: 1.1,
                 fontWeight: FontWeight.w600,
               ),
             ),

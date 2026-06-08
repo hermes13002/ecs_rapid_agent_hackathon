@@ -34,14 +34,14 @@ class SimulationBottomToolbar extends StatelessWidget {
         children: [
           Icon(
             hasDesignErrors ? Icons.warning_amber_rounded : Icons.check_circle_outline,
-            color: hasDesignErrors ? AppColors.error : Colors.cyan,
+            color: hasDesignErrors ? AppColors.error : Colors.white,
             size: 18,
           ),
           const SizedBox(width: 8),
           Text(
             hasDesignErrors ? 'Design Errors' : 'No Design Errors',
             style: TextStyle(
-              color: hasDesignErrors ? AppColors.error : Colors.cyan,
+              color: hasDesignErrors ? AppColors.error : Colors.white,
               fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
@@ -91,21 +91,17 @@ class SimulationBottomToolbar extends StatelessWidget {
                 height: 28,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: const Color(
-                    0xFFD4F1F4,
-                  ), // Light cyan matching the image
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Row(
                   children: const [
-                    Icon(Icons.play_arrow, color: Color(0xFF005B7F), size: 16),
+                    Icon(Icons.play_arrow, color: Colors.black, size: 16),
                     SizedBox(width: 6),
                     Text(
                       'RUN SIMULATION',
                       style: TextStyle(
-                        color: Color(
-                          0xFF005B7F,
-                        ), // Dark cyan/blue matching the image
+                        color: Colors.black,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.8,
@@ -118,13 +114,26 @@ class SimulationBottomToolbar extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           // Simulation Expand/Collapse Toggle
-          IconButton(
-            icon: Icon(
-              isSimulationExpanded ? Icons.analytics : Icons.analytics_outlined,
-              size: 22,
+          Tooltip(
+            message: 'Toggle Simulation Panel',
+            preferBelow: false,
+            child: InkWell(
+              onTap: onToggleExpand,
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: isSimulationExpanded ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Icon(
+                  isSimulationExpanded ? Icons.analytics : Icons.analytics_outlined,
+                  color: isSimulationExpanded ? Colors.black : AppColors.textSecondary,
+                  size: 20,
+                ),
+              ),
             ),
-            color: AppColors.textSecondary,
-            onPressed: onToggleExpand,
           ),
         ],
       ),

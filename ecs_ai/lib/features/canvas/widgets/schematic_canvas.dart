@@ -32,6 +32,7 @@ class SchematicCanvas extends StatefulWidget {
     this.onElementsMoved,
     this.onWireAdded,
     this.onWireSplit,
+    this.onComponentRightClick,
   });
 
   /// standard widget properties
@@ -58,6 +59,9 @@ class SchematicCanvas extends StatefulWidget {
 
   /// called when branching a wire
   final WireNode? Function(String wireId, Offset splitPosition)? onWireSplit;
+
+  /// called when right-clicking a component
+  final void Function(String componentId, Offset pointerPosition)? onComponentRightClick;
 
   @override
   State<SchematicCanvas> createState() => _SchematicCanvasState();
@@ -346,6 +350,16 @@ class _SchematicCanvasState extends State<SchematicCanvas> with SingleTickerProv
       event.localPosition,
       widget.transformationController.value,
     );
+
+    if (event.buttons == kSecondaryButton) {
+      for (final component in widget.components.reversed) {
+        if (component.boundingRect.contains(localOffset)) {
+          widget.onComponentRightClick?.call(component.id, event.position);
+          return;
+        }
+      }
+      return;
+    }
 
     if (widget.activeTool == 'WIRE') {
       final hitNode = _hitTestPin(localOffset);

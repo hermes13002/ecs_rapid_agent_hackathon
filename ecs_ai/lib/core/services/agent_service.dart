@@ -18,12 +18,14 @@ class AgentService {
   WebSocketChannel? _channel;
   bool _isConnected = false;
 
-  final _simulationController = StreamController<Map<String, dynamic>>.broadcast();
+  final _simulationController =
+      StreamController<Map<String, dynamic>>.broadcast();
   final _reasoningController = StreamController<String>.broadcast();
   final _errorController = StreamController<String>.broadcast();
 
   /// stream of simulation result payloads (net voltages)
-  Stream<Map<String, dynamic>> get simulationResults => _simulationController.stream;
+  Stream<Map<String, dynamic>> get simulationResults =>
+      _simulationController.stream;
 
   /// stream of agent reasoning tokens (streamed from groq)
   Stream<String> get agentReasoning => _reasoningController.stream;
@@ -39,8 +41,10 @@ class AgentService {
 
     try {
       final token = await AuthService.getToken();
-      final uri = token != null ? '$baseUrl/ws/simulate?token=$token' : '$baseUrl/ws/simulate';
-      
+      final uri = token != null
+          ? '$baseUrl/ws/simulate?token=$token'
+          : '$baseUrl/ws/simulate';
+
       _channel = WebSocketChannel.connect(Uri.parse(uri));
       await _channel!.ready;
       _isConnected = true;
@@ -76,16 +80,15 @@ class AgentService {
   }) {
     if (!_isConnected || _channel == null) return;
 
-    final schematic = NetlistResolver.serializeSchematic(components, wires, chatHistory: chatHistory);
-    final payload = jsonEncode({
-      'action': 'simulate',
-      'schematic': schematic,
-    });
+    final schematic = NetlistResolver.serializeSchematic(
+      components,
+      wires,
+      chatHistory: chatHistory,
+    );
+    final payload = jsonEncode({'action': 'simulate', 'schematic': schematic});
 
     _channel!.sink.add(payload);
   }
-
-
 
   void _handleMessage(String raw) {
     if (raw.trim().isEmpty) return;
@@ -102,7 +105,7 @@ class AgentService {
 
       if (action == 'simulate') {
         _simulationController.add(data['result'] as Map<String, dynamic>);
-        } else if (action == 'reasoning_token') {
+      } else if (action == 'reasoning_token') {
         // streamed reasoning from agent
         final token = data['token'] as String? ?? '';
         _reasoningController.add(token);
