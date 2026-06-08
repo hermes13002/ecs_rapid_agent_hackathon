@@ -1,3 +1,5 @@
+import csv
+import json
 import os
 import logging
 import tempfile
@@ -141,102 +143,85 @@ def generate_netlist(schematic: CircuitSchematic) -> str:
     lines.append(".model DLED D(Is=1e-20 N=1.6 Rs=4)")
     lines.append(".model Q2N2222 NPN(Is=14.34f Bf=255.9)")
     lines.append(".model Q2N2907 PNP(Is=650.6E-18 Bf=231.7)")
+    lines.append(".tran ")
     lines.append("")
 
     return "\n".join(lines)
 
 
-# def run_operating_point(schematic: CircuitSchematic) -> Tuple[bool, Dict, Optional[str]]:
-#     """
-#     runs dc operating point analysis.
-#     returns (success, node_voltages, error_message)
-#     """
-#     netlist_str = generate_netlist(schematic)
-#     netlist_str = netlist_str.strip()
-#     # Force a clean .op and .end with a guaranteed newline AFTER it
-#     netlist_str += "\n.op\n.end\n"
-#
-#     logger.info(f"generated netlist:\n{netlist_str}")
-#
-#     try:
-#         from PySpice.Spice.Netlist import Circuit
-#         from PySpice.Spice.NgSpice.Shared import NgSpiceShared
-#     except ImportError:
-#         # pyspice/ngspice not available, return netlist only
-#         return False, {"netlist": netlist_str}, "PySpice not installed"
-#
-#     try:
-#         # configure ngspice path from env
-#         lib_path = os.environ.get("NGSPICE_LIB_PATH")
-#         if lib_path:
-#             os.environ["SPICE_LIB_DIR"] = lib_path
-#
-#         # Explicitly map SPICE_SCRIPTS so ngspice can find spinit and initialize models
-#         scripts_path = os.path.abspath(os.path.join("venv", "Lib", "site-packages", "PySpice", "Spice", "NgSpice", "Spice64_dll", "Scripts"))
-#         if os.path.exists(scripts_path):
-#             os.environ["SPICE_SCRIPTS"] = scripts_path
-#
-#         ngspice = NgSpiceShared.new_instance()
-#         # load_circuit takes the raw netlist string, NOT a file path!
-#         ngspice.load_circuit(netlist_str)
-#         ngspice.run()
-#
-#         # extract node voltages
-#         node_voltages = {}
-#         plot = ngspice.plot(simulation=None, plot_name=ngspice.last_plot)
-#         for name in plot.keys():
-#             node_voltages[name] = float(plot[name]._data[0])
-#
-#         return True, {"node_voltages": node_voltages, "netlist": netlist_str}, None
-#
-#     except Exception as e:
-#         error_msg = str(e)
-#         logger.error(f"spice simulation failed: {error_msg}")
-#
-#         # detect specific failure modes
-#         failure_type = "unknown"
-#         if "singular" in error_msg.lower():
-#             failure_type = "matrix_singularity"
-#         elif "convergence" in error_msg.lower():
-#             failure_type = "convergence_failure"
-#         elif "no ground" in error_msg.lower() or "no dc path" in error_msg.lower():
-#             failure_type = "missing_ground"
-#
-#         return False, {
-#             "netlist": netlist_str,
-#             "failure_type": failure_type,
-#         }, error_msg
 
-def run_simulation(schematic: CircuitSchematic, output="simulation_output")->str:
-    #create the netlist file
+# def run_simulation(schematic: CircuitSchematic, output="simulation_output")->str:
+#     #create the netlist file
+#     netlist_str = generate_netlist(schematic).strip()
+#
+#     # create output path
+#     output_path = Path(output).resolve()
+#     output_path.mkdir(parents=True, exist_ok=True)
+#
+#     #create filepath and write netlist to it
+#     netlist_file = output_path/"circuit.cir"
+#     netlist_file.write_text(netlist_str, encoding= "utf-8")
+#
+#     #run the simulation
+#     runner = SimRunner(simulator=NGspiceSimulator, output_folder=str(output))
+#     #create run file path
+#     run_file_path = output_path/netlist_file.name
+#
+#     #log outputs
+#     raw_file, log_file = runner.run_now(str(netlist_file), run_filename=str(run_file_path))
+#
+#     # pass .raw output file to parser
+#     out = RawRead(raw_file)
+#
+#     csv_out = Path(raw_file).with_suffix(".csv")
+#
+#     # print output to csv file
+#     out.to_csv(csv_out)
+#
+#     # print(f"Simulation finished! Waveform data saved to: {raw_file}")
+#     return raw_file
+
+
+import tempfile
+from pathlib import Path
+
+
+# Assuming your other imports (SimRunner, RawRead, etc.) are at the top
+
+def run_simulation(schematic: CircuitSchematic) -> str:
+    #convert netlist to string
     netlist_str = generate_netlist(schematic).strip()
 
-    # create output path
-    output_path = Path(output).resolve()
-    output_path.mkdir(parents=True, exist_ok=True)
+    #create temporary directory with temp
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
 
-    #create filepath and write netlist to it
-    netlist_file = output_path/"circuit.cir"
-    netlist_file.write_text(netlist_str, encoding= "utf-8")
+        #write netlist to file in temp directory
+        netlist_file = temp_path / "circuit.cir"
+        netlist_file.write_text(netlist_str, encoding="utf-8")
 
-    #run the simulation
-    runner = SimRunner(simulator=NGspiceSimulator, output_folder=str(output))
-    #create run file path
-    run_file_path = output_path/netlist_file.name
+        #point simulation engine to temp folder
+        runner = SimRunner(simulator=NGspiceSimulator, output_folder=str(temp_path))
+        run_file_path = temp_path / netlist_file.name
 
-    #log outputs
-    raw_file, log_file = runner.run_now(str(netlist_file), run_filename=str(run_file_path))
+        #log outputs
+        raw_file, log_file = runner.run_now(str(netlist_file), run_filename=str(run_file_path))
 
-    # pass .raw output file to parser
-    out = RawRead(raw_file)
+        #Pass .raw output file to parser
+        out = RawRead(raw_file)
 
-    csv_out = Path(raw_file).with_suffix(".csv")
+        #convert to CSV
+        csv_out = temp_path / "output.csv"
+        out.to_csv(csv_out)
 
-    # print output to csv file
-    out.to_csv(csv_out)
+        #read CSV file and convert it to JSON
+        with open(csv_out, mode='r', encoding='utf-8') as f:
+            csv_read = csv.DictReader(f)
+            data_list = list(csv_read)
 
-    # print(f"Simulation finished! Waveform data saved to: {raw_file}")
-    return raw_file
+            json_output = json.dumps(data_list)
+
+    return json_output
 
 
 def validate_topology(schematic: CircuitSchematic) -> list[dict]:
