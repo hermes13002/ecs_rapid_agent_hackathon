@@ -4,6 +4,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 import jwt
 from app.routers.auth import SECRET_KEY, ALGORITHM
 from app.schemas.circuit import CircuitSchematic, ComponentType
+#from app.engine.spice_engine import run_operating_point, validate_topology, _build_net_map, _get_node
 from app.engine.spice_engine import run_operating_point, validate_topology, _build_net_map, _get_node
 from app.services.service import auto_save_project
 

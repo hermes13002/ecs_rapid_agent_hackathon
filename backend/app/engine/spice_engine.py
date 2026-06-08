@@ -1,8 +1,16 @@
 import os
 import logging
 import tempfile
+from json import JSONDecoder
+from os import write
+from pathlib import Path
 from typing import Dict, Optional, Tuple
 
+from spicelib import SpiceEditor, SimRunner
+from spicelib.simulators.ngspice_simulator import NGspiceSimulator
+from spicelib import RawRead
+
+from app.schemas import circuit
 from app.schemas.circuit import CircuitSchematic, ComponentType, LogicalNet
 
 logger = logging.getLogger(__name__)
@@ -138,68 +146,97 @@ def generate_netlist(schematic: CircuitSchematic) -> str:
     return "\n".join(lines)
 
 
-def run_operating_point(
-    schematic: CircuitSchematic,
-) -> Tuple[bool, Dict, Optional[str]]:
-    """
-    runs dc operating point analysis.
-    returns (success, node_voltages, error_message)
-    """
-    netlist_str = generate_netlist(schematic)
-    netlist_str = netlist_str.strip()
-    # Force a clean .op and .end with a guaranteed newline AFTER it
-    netlist_str += "\n.op\n.end\n"
+# def run_operating_point(schematic: CircuitSchematic) -> Tuple[bool, Dict, Optional[str]]:
+#     """
+#     runs dc operating point analysis.
+#     returns (success, node_voltages, error_message)
+#     """
+#     netlist_str = generate_netlist(schematic)
+#     netlist_str = netlist_str.strip()
+#     # Force a clean .op and .end with a guaranteed newline AFTER it
+#     netlist_str += "\n.op\n.end\n"
+#
+#     logger.info(f"generated netlist:\n{netlist_str}")
+#
+#     try:
+#         from PySpice.Spice.Netlist import Circuit
+#         from PySpice.Spice.NgSpice.Shared import NgSpiceShared
+#     except ImportError:
+#         # pyspice/ngspice not available, return netlist only
+#         return False, {"netlist": netlist_str}, "PySpice not installed"
+#
+#     try:
+#         # configure ngspice path from env
+#         lib_path = os.environ.get("NGSPICE_LIB_PATH")
+#         if lib_path:
+#             os.environ["SPICE_LIB_DIR"] = lib_path
+#
+#         # Explicitly map SPICE_SCRIPTS so ngspice can find spinit and initialize models
+#         scripts_path = os.path.abspath(os.path.join("venv", "Lib", "site-packages", "PySpice", "Spice", "NgSpice", "Spice64_dll", "Scripts"))
+#         if os.path.exists(scripts_path):
+#             os.environ["SPICE_SCRIPTS"] = scripts_path
+#
+#         ngspice = NgSpiceShared.new_instance()
+#         # load_circuit takes the raw netlist string, NOT a file path!
+#         ngspice.load_circuit(netlist_str)
+#         ngspice.run()
+#
+#         # extract node voltages
+#         node_voltages = {}
+#         plot = ngspice.plot(simulation=None, plot_name=ngspice.last_plot)
+#         for name in plot.keys():
+#             node_voltages[name] = float(plot[name]._data[0])
+#
+#         return True, {"node_voltages": node_voltages, "netlist": netlist_str}, None
+#
+#     except Exception as e:
+#         error_msg = str(e)
+#         logger.error(f"spice simulation failed: {error_msg}")
+#
+#         # detect specific failure modes
+#         failure_type = "unknown"
+#         if "singular" in error_msg.lower():
+#             failure_type = "matrix_singularity"
+#         elif "convergence" in error_msg.lower():
+#             failure_type = "convergence_failure"
+#         elif "no ground" in error_msg.lower() or "no dc path" in error_msg.lower():
+#             failure_type = "missing_ground"
+#
+#         return False, {
+#             "netlist": netlist_str,
+#             "failure_type": failure_type,
+#         }, error_msg
 
-    logger.info(f"generated netlist:\n{netlist_str}")
+def run_simulation(schematic: CircuitSchematic, output="simulation_output")->str:
+    #create the netlist file
+    netlist_str = generate_netlist(schematic).strip()
 
-    try:
-        from PySpice.Spice.Netlist import Circuit
-        from PySpice.Spice.NgSpice.Shared import NgSpiceShared
-    except ImportError:
-        # pyspice/ngspice not available, return netlist only
-        return False, {"netlist": netlist_str}, "PySpice not installed"
+    # create output path
+    output_path = Path(output).resolve()
+    output_path.mkdir(parents=True, exist_ok=True)
 
-    try:
-        # configure ngspice path from env
-        lib_path = os.environ.get("NGSPICE_LIB_PATH")
-        if lib_path:
-            os.environ["SPICE_LIB_DIR"] = lib_path
+    #create filepath and write netlist to it
+    netlist_file = output_path/"circuit.cir"
+    netlist_file.write_text(netlist_str, encoding= "utf-8")
 
-        # Explicitly map SPICE_SCRIPTS so ngspice can find spinit and initialize models
-        scripts_path = os.path.abspath(os.path.join("venv", "Lib", "site-packages", "PySpice", "Spice", "NgSpice", "Spice64_dll", "Scripts"))
-        if os.path.exists(scripts_path):
-            os.environ["SPICE_SCRIPTS"] = scripts_path
+    #run the simulation
+    runner = SimRunner(simulator=NGspiceSimulator, output_folder=str(output))
+    #create run file path
+    run_file_path = output_path/netlist_file.name
 
-        ngspice = NgSpiceShared.new_instance()
-        # load_circuit takes the raw netlist string, NOT a file path!
-        ngspice.load_circuit(netlist_str)
-        ngspice.run()
+    #log outputs
+    raw_file, log_file = runner.run_now(str(netlist_file), run_filename=str(run_file_path))
 
-        # extract node voltages
-        node_voltages = {}
-        plot = ngspice.plot(simulation=None, plot_name=ngspice.last_plot)
-        for name in plot.keys():
-            node_voltages[name] = float(plot[name]._data[0])
+    # pass .raw output file to parser
+    out = RawRead(raw_file)
 
-        return True, {"node_voltages": node_voltages, "netlist": netlist_str}, None
+    csv_out = Path(raw_file).with_suffix(".csv")
 
-    except Exception as e:
-        error_msg = str(e)
-        logger.error(f"spice simulation failed: {error_msg}")
+    # print output to csv file
+    out.to_csv(csv_out)
 
-        # detect specific failure modes
-        failure_type = "unknown"
-        if "singular" in error_msg.lower():
-            failure_type = "matrix_singularity"
-        elif "convergence" in error_msg.lower():
-            failure_type = "convergence_failure"
-        elif "no ground" in error_msg.lower() or "no dc path" in error_msg.lower():
-            failure_type = "missing_ground"
-
-        return False, {
-            "netlist": netlist_str,
-            "failure_type": failure_type,
-        }, error_msg
+    # print(f"Simulation finished! Waveform data saved to: {raw_file}")
+    return raw_file
 
 
 def validate_topology(schematic: CircuitSchematic) -> list[dict]:
@@ -252,3 +289,5 @@ def validate_topology(schematic: CircuitSchematic) -> list[dict]:
                 })
 
     return issues
+
+
