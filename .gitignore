@@ -6,3 +6,5 @@
 test_ws_prod.py
 test_ws.py
 .firebase
+.vscode
+pr_*.txt
