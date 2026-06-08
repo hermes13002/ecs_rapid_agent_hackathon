@@ -4,7 +4,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 import jwt
 from app.routers.auth import SECRET_KEY, ALGORITHM
 from app.schemas.circuit import CircuitSchematic, ComponentType
-from app.engine.spice_engine import run_operating_point, validate_topology, _build_net_map, _get_node
+#from app.engine.spice_engine import run_operating_point, validate_topology, _build_net_map, _get_node
+from app.engine.spice_engine import run_simulation, validate_topology, _build_net_map, _get_node
 from app.services.service import auto_save_project
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,8 @@ async def ws_simulate(websocket: WebSocket, token: str = Query(None)):
         return
 
     await websocket.accept()
+    from app.core.ws_manager import manager
+    manager.connect(websocket, user_id)
     logger.info(f"ws client connected for user: {user_id}")
 
     try:
@@ -82,7 +85,7 @@ async def ws_simulate(websocket: WebSocket, token: str = Query(None)):
                     continue
 
                 # run spice operating point
-                success, data, error_msg = run_operating_point(schematic)
+                success, data, error_msg = run_simulation(schematic)
 
                 if success:
                     node_voltages = data.get("node_voltages", {})
@@ -187,3 +190,5 @@ async def ws_simulate(websocket: WebSocket, token: str = Query(None)):
             await websocket.close(code=1011)
         except Exception:
             pass
+    finally:
+        manager.disconnect(websocket, user_id)
