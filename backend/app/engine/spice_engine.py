@@ -219,7 +219,7 @@ def run_simulation(schematic: CircuitSchematic) -> str:
             csv_read = csv.DictReader(f)
             data_list = list(csv_read)
 
-            json_output = json.dumps(data_list)
+            json_output = json.dumps(data_list, indent=5)
 
     return json_output
 
