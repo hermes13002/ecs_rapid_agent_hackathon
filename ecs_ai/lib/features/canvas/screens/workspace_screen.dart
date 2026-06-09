@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:vector_math/vector_math_64.dart' as v64;
 import 'package:ecs_ai/app/theme/app_colors.dart';
@@ -15,7 +13,6 @@ import 'package:ecs_ai/core/utils/id_generator.dart';
 import 'package:collection/collection.dart';
 import 'package:ecs_ai/core/services/agent_service.dart';
 import 'package:ecs_ai/core/services/wire_router_service.dart';
-import 'package:ecs_ai/shared/widgets/panel_container.dart';
 import 'package:ecs_ai/shared/widgets/custom_snackbar.dart';
 import 'package:ecs_ai/features/canvas/widgets/schematic_canvas.dart';
 import 'package:ecs_ai/features/canvas/widgets/properties_panel.dart';
@@ -24,12 +21,14 @@ import 'package:ecs_ai/core/services/ide_agent_service.dart';
 import 'package:ecs_ai/core/services/auth_service.dart';
 import 'package:ecs_ai/features/auth/widgets/auth_dialog.dart';
 
-class IdeNotification {
-  IdeNotification(this.message, {this.type = 'error'});
-  final String id = IdGenerator.next('notif_');
-  final String message;
-  final String type;
-}
+import 'package:ecs_ai/core/models/ide_notification.dart';
+import 'package:ecs_ai/features/canvas/widgets/workspace_toolbar.dart';
+import 'package:ecs_ai/features/canvas/widgets/workspace_drawer.dart';
+import 'package:ecs_ai/features/canvas/widgets/notification_card.dart';
+import 'package:ecs_ai/features/canvas/widgets/floating_toolbar.dart';
+import 'package:ecs_ai/features/canvas/widgets/simulation_bottom_toolbar.dart';
+import 'package:ecs_ai/features/canvas/widgets/simulation_panel.dart';
+import 'package:ecs_ai/features/canvas/widgets/component_library_panel.dart';
 
 /// main ide-style workspace layout
 class WorkspaceScreen extends StatefulWidget {
@@ -41,10 +40,12 @@ class WorkspaceScreen extends StatefulWidget {
 
 class _WorkspaceScreenState extends State<WorkspaceScreen> {
   // panel expansion tracking
-  bool _isComponentsExpanded = true;
-  bool _isPropertiesExpanded = true;
+  int _leftPanelTabIndex = 0;
+  bool _isLeftPanelOpen = true;
   bool _isAiExpanded = true;
   bool _isSimulationExpanded = true;
+  int _simulationTabIndex = 0; // 0 = Waveform, 1 = Component Values
+  final String _componentSearchQuery = '';
 
   late final TransformationController _transformationController;
   String _activeTool = 'SELECT';
@@ -62,8 +63,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   late final AgentService _agentService;
   late final IdeAgentService _ideAgentService;
   Timer? _debounceTimer;
-  Map<String, double> _nodeVoltages = {};
-  Map<String, Map<String, dynamic>> _componentMetrics = {};
+  final Map<String, double> _nodeVoltages = {};
+  final Map<String, Map<String, dynamic>> _componentMetrics = {};
+  final Map<String, List<double>> _timeSeriesData = {};
+  Map<String, dynamic> _simulationConfig = {'type': 'op'};
   double _bottomPanelHeight = AppConstants.bottomBarHeight;
   String _aiReasoningTokenStream = '';
   final List<Map<String, dynamic>> _aiChatHistory = [];
@@ -77,6 +80,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   bool _pendingToolResponse = false;
   final List<Map<String, dynamic>> _currentTurnActions = [];
   final ScrollController _simScrollController = ScrollController();
+  final bool _hasDesignErrors = false;
 
   String _formatNodeKey(String key) {
     final parts = key.split(':');
@@ -94,7 +98,21 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   String? _activeSessionId;
   List<Map<String, dynamic>> _chatSessions = [];
 
+  String get _activeSessionTitle {
+    if (_activeSessionId == null) return 'AI COPILOT';
+    final session = _chatSessions.firstWhere(
+      (s) => s['id'] == _activeSessionId,
+      orElse: () => <String, dynamic>{},
+    );
+    final title = session['title'] as String?;
+    return title != null && title.isNotEmpty ? title : 'Conversation';
+  }
+
   double _rightSidebarWidth = AppConstants.sidebarWidth;
+
+  final bool _showContextMenu = false;
+  final Offset _contextMenuPosition = Offset.zero;
+  String? _contextMenuComponentId;
 
   @override
   void initState() {
@@ -121,6 +139,16 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     _agentService.simulationResults.listen((result) {
       if (!mounted) return;
       setState(() {
+        // parse Time-Series data (Transient/AC)
+        final timeSeries = result['time_series'] as Map<String, dynamic>?;
+        if (timeSeries != null) {
+          _timeSeriesData.clear();
+          for (final entry in timeSeries.entries) {
+            final list = entry.value as List<dynamic>? ?? [];
+            _timeSeriesData[entry.key] = list.map((e) => (e as num).toDouble()).toList();
+          }
+        }
+
         final nets = result['nets'] as List<dynamic>?;
         if (nets != null) {
           _nodeVoltages.clear();
@@ -148,6 +176,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
               }
             }
           }
+          _simulationStatus = 'Simulated';
+        } else if (timeSeries != null) {
+          // if we got time series data but no net voltages, still mark as simulated
           _simulationStatus = 'Simulated';
         }
       });
@@ -319,45 +350,24 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     _transformationController.value = Matrix4.identity()..translate(tx, ty);
   }
 
-  Widget _buildDampenedScrollView({required Widget child}) {
-    return Listener(
-      onPointerSignal: (event) {
-        if (event is PointerScrollEvent) {
-          final dampened = event.scrollDelta.dy * 0.3;
-          _simScrollController.jumpTo(
-            (_simScrollController.offset + dampened).clamp(
-              0.0,
-              _simScrollController.position.maxScrollExtent,
-            ),
-          );
-        }
-      },
-      child: ScrollConfiguration(
-        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-        child: Scrollbar(
-          controller: _simScrollController,
-          thumbVisibility: true,
-          thickness: 4,
-          radius: const Radius.circular(2),
-          child: SingleChildScrollView(
-            controller: _simScrollController,
-            physics: const NeverScrollableScrollPhysics(),
-            child: child,
-          ),
-        ),
-      ),
-    );
-  }
+  void _scheduleSimulation({bool isManual = false}) {
+    if (!isManual && _simulationConfig['type'] != 'op') {
+      return;
+    }
 
-  void _scheduleSimulation() {
     setState(() {
       _simulationStatus = 'Simulating...';
       _nodeVoltages.clear();
       _componentMetrics.clear();
+      _timeSeriesData.clear();
     });
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-      _agentService.simulate(_components, _wires);
+      _agentService.simulate(
+        _components, 
+        _wires,
+        simulationConfig: _simulationConfig,
+      );
     });
   }
 
@@ -709,6 +719,42 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     });
   }
 
+  void _deleteSelected() {
+    if (_selectedComponentIds.isEmpty && _selectedWireIds.isEmpty) return;
+    setState(() {
+      _components = _components
+          .where((c) => !_selectedComponentIds.contains(c.id))
+          .toList();
+
+      _wires = _wires
+          .where(
+            (w) =>
+                !_selectedWireIds.contains(w.id) &&
+                !_selectedComponentIds.contains(w.startNode.componentId) &&
+                !_selectedComponentIds.contains(w.endNode.componentId),
+          )
+          .toList();
+      _selectedComponentIds.clear();
+      _selectedWireIds.clear();
+      _updateConnectionStates();
+    });
+    _scheduleSimulation();
+  }
+
+  void _rotateSelected(int delta) {
+    if (_selectedComponentIds.isEmpty) return;
+    setState(() {
+      _components = _components.map((comp) {
+        if (_selectedComponentIds.contains(comp.id)) {
+          return comp.copyWith(rotation: (comp.rotation + delta) % 360);
+        }
+        return comp;
+      }).toList();
+      _updateConnectionStates();
+    });
+    _scheduleSimulation();
+  }
+
   void _zoom(double delta) {
     final matrix = _transformationController.value.clone();
     final currentScale = matrix.getMaxScaleOnAxis();
@@ -725,24 +771,6 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
 
   void _resetZoom() {
     _transformationController.value = Matrix4.identity();
-  }
-
-  Widget _buildSidebarPanel({
-    required String title,
-    required bool isExpanded,
-    required VoidCallback onToggle,
-    required Widget child,
-  }) {
-    final panel = PanelContainer(
-      title: title,
-      isExpanded: isExpanded,
-      onToggle: onToggle,
-      child: child,
-    );
-    if (isExpanded) {
-      return Expanded(child: panel);
-    }
-    return panel;
   }
 
   @override
@@ -780,29 +808,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
               event.logicalKey == LogicalKeyboardKey.backspace) {
             if (_selectedComponentIds.isNotEmpty ||
                 _selectedWireIds.isNotEmpty) {
-              setState(() {
-                _components = _components
-                    .where((c) => !_selectedComponentIds.contains(c.id))
-                    .toList();
-
-                // delete attached wires OR explicitly selected wires
-                _wires = _wires
-                    .where(
-                      (w) =>
-                          !_selectedWireIds.contains(w.id) &&
-                          !_selectedComponentIds.contains(
-                            w.startNode.componentId,
-                          ) &&
-                          !_selectedComponentIds.contains(
-                            w.endNode.componentId,
-                          ),
-                    )
-                    .toList();
-                _selectedComponentIds.clear();
-                _selectedWireIds.clear();
-                _updateConnectionStates();
-              });
-              _scheduleSimulation();
+              _deleteSelected();
               return KeyEventResult.handled;
             }
           } // closes if (delete || backspace)
@@ -810,24 +816,98 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         return KeyEventResult.ignored;
       },
       child: Scaffold(
-        drawer: _buildDrawer(context),
+        drawer: const WorkspaceDrawer(),
         body: Stack(
           children: [
             Column(
               children: [
-                _buildToolbar(context),
+                WorkspaceToolbar(
+                  onLogoutSuccess: () {
+                    _initAgent();
+                    _loadSessions();
+                  },
+                ),
                 const Divider(height: 1),
                 Expanded(
                   child: Row(
                     children: [
-                      // left sidebar - component library (horizontal slide)
+                      // left sidebar - tabs (icon rail) + panel content
+                      Container(
+                        width: 48,
+                        color: AppColors.surfaceVariant,
+                        child: Column(
+                          children: [
+                            const SizedBox(height: 16),
+                            Tooltip(
+                              message: 'Component Library',
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    if (_leftPanelTabIndex == 0) {
+                                      _isLeftPanelOpen = !_isLeftPanelOpen;
+                                    } else {
+                                      _leftPanelTabIndex = 0;
+                                      _isLeftPanelOpen = true;
+                                    }
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(4),
+                                child: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: _leftPanelTabIndex == 0 ? Colors.white : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Icon(
+                                    Icons.category_outlined,
+                                    color: _leftPanelTabIndex == 0 ? Colors.black : AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Tooltip(
+                              message: 'Properties',
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    if (_leftPanelTabIndex == 1) {
+                                      _isLeftPanelOpen = !_isLeftPanelOpen;
+                                    } else {
+                                      _leftPanelTabIndex = 1;
+                                      _isLeftPanelOpen = true;
+                                    }
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(4),
+                                child: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: _leftPanelTabIndex == 1 ? Colors.white : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Icon(
+                                    Icons.tune_outlined,
+                                    color: _leftPanelTabIndex == 1 ? Colors.black : AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const VerticalDivider(
+                        width: 1,
+                        thickness: 1,
+                        color: AppColors.panelBorder,
+                      ),
                       AnimatedContainer(
                         duration: AppConstants.panelAnimDuration,
-                        width: _isComponentsExpanded
-                            ? AppConstants.sidebarWidth
-                            : 0,
+                        width: _isLeftPanelOpen ? AppConstants.sidebarWidth : 0,
                         curve: Curves.easeInOut,
-                        child: _isComponentsExpanded
+                        child: _isLeftPanelOpen
                             ? Container(
                                 decoration: const BoxDecoration(
                                   color: AppColors.panel,
@@ -837,82 +917,15 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                     ),
                                   ),
                                 ),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    InkWell(
-                                      onTap: () => setState(
-                                        () => _isComponentsExpanded =
-                                            !_isComponentsExpanded,
-                                      ),
-                                      child: Container(
-                                        height: AppConstants.panelHeaderHeight,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                        ),
-                                        color: AppColors.surfaceVariant,
-                                        child: Row(
-                                          children: [
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              'COMPONENTS',
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .labelMedium
-                                                  ?.copyWith(
-                                                    letterSpacing: 1.2,
-                                                    fontWeight: FontWeight.w600,
-                                                    color:
-                                                        AppColors.textPrimary,
-                                                  ),
-                                            ),
-                                            const Spacer(),
-                                            const Icon(
-                                              Icons.chevron_left,
-                                              size: 18,
-                                              color: AppColors.textSecondary,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    const Divider(height: 1),
-                                    Expanded(child: _buildComponentLibrary()),
-                                  ],
-                                ),
+                                child: _leftPanelTabIndex == 0
+                                    ? ComponentLibraryPanel(
+                                        activeTool: _activeTool,
+                                        onSelectComponent: _selectComponentToPlace,
+                                      )
+                                    : _buildPropertiesPanel(),
                               )
                             : const SizedBox.shrink(),
                       ),
-                      // collapsed toggle button
-                      if (!_isComponentsExpanded)
-                        GestureDetector(
-                          onTap: () =>
-                              setState(() => _isComponentsExpanded = true),
-                          child: Container(
-                            width: 24,
-                            decoration: const BoxDecoration(
-                              color: AppColors.surfaceVariant,
-                              border: Border(
-                                right: BorderSide(color: AppColors.panelBorder),
-                              ),
-                            ),
-                            child: const Center(
-                              child: RotatedBox(
-                                quarterTurns: 3,
-                                child: Text(
-                                  'COMPONENTS',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textSecondary,
-                                    letterSpacing: 1.5,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
 
                       // center - canvas area
                       Expanded(
@@ -936,333 +949,388 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                         ),
                       ),
 
-                      // right sidebar - properties + ai
-                      MouseRegion(
-                        cursor: SystemMouseCursors.resizeLeftRight,
-                        child: GestureDetector(
-                          onHorizontalDragUpdate: (details) {
-                            setState(() {
-                              _rightSidebarWidth =
-                                  (_rightSidebarWidth - details.delta.dx).clamp(
-                                    200.0,
-                                    600.0,
-                                  );
-                            });
-                          },
+                      // collapsed toggle button for right sidebar
+                      if (!_isAiExpanded)
+                        GestureDetector(
+                          onTap: () => setState(() => _isAiExpanded = true),
                           child: Container(
-                            width: 4,
-                            color: Colors.transparent,
-                            child: Center(
-                              child: Container(
-                                width: 2,
-                                height: 20,
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceVariant,
-                                  borderRadius: BorderRadius.circular(2),
+                            width: 24,
+                            decoration: const BoxDecoration(
+                              color: AppColors.surfaceVariant,
+                              border: Border(
+                                left: BorderSide(color: AppColors.panelBorder),
+                              ),
+                            ),
+                            child: const Center(
+                              child: RotatedBox(
+                                quarterTurns: 3,
+                                child: Text(
+                                  'AI AGENT',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textSecondary,
+                                    letterSpacing: 1.5,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      SizedBox(
-                        width: _rightSidebarWidth,
-                        child: Column(
-                          children: [
-                            _buildSidebarPanel(
-                              title: 'Properties',
-                              isExpanded: _isPropertiesExpanded,
-                              onToggle: () => setState(
-                                () => _isPropertiesExpanded =
-                                    !_isPropertiesExpanded,
+
+                      // right sidebar - ai agent (horizontal slide)
+                      AnimatedContainer(
+                        duration: AppConstants.panelAnimDuration,
+                        width: _isAiExpanded ? _rightSidebarWidth : 0,
+                        curve: Curves.easeInOut,
+                        child: !_isAiExpanded
+                            ? const SizedBox.shrink()
+                            : Row(
+                                children: [
+                                  // resize handle
+                                  MouseRegion(
+                                    cursor: SystemMouseCursors.resizeLeftRight,
+                                    child: GestureDetector(
+                                      onHorizontalDragUpdate: (details) {
+                                        setState(() {
+                                          _rightSidebarWidth =
+                                              (_rightSidebarWidth - details.delta.dx)
+                                                  .clamp(200.0, 600.0);
+                                        });
+                                      },
+                                      child: Container(
+                                        width: 8,
+                                        decoration: const BoxDecoration(
+                                          color: Colors.transparent,
+                                          border: Border(
+                                            left: BorderSide(color: AppColors.panelBorder, width: 1),
+                                          ),
+                                        ),
+                                        child: Center(
+                                          child: Container(
+                                            width: 3,
+                                            height: 36,
+                                            decoration: BoxDecoration(
+                                              color: AppColors.textSecondary.withValues(alpha: 0.5),
+                                              borderRadius: BorderRadius.circular(1.5),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  // main panel content
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Container(
+                                          height: 32,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                          ),
+                                          color: AppColors.surfaceVariant,
+                                          child: Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.smart_toy_outlined,
+                                                size: 14,
+                                                color: AppColors.textSecondary,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  _activeSessionTitle,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .labelMedium
+                                                      ?.copyWith(
+                                                        letterSpacing: 1.0,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: AppColors.textSecondary,
+                                                        fontSize: 11,
+                                                      ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Tooltip(
+                                                message: 'New Chat',
+                                                child: InkWell(
+                                                  onTap: () {
+                                                    setState(() {
+                                                      _activeSessionId = null;
+                                                      _aiChatHistory.clear();
+                                                      _aiReasoningTokenStream = '';
+                                                    });
+                                                  },
+                                                  borderRadius: BorderRadius.zero,
+                                                  child: const Padding(
+                                                    padding: EdgeInsets.all(4.0),
+                                                    child: Icon(Icons.add, size: 14, color: AppColors.textSecondary),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Tooltip(
+                                                message: 'Chat History',
+                                                child: InkWell(
+                                                  onTap: () {
+                                                    showDialog(
+                                                      context: context,
+                                                      builder: (context) {
+                                                        String searchQuery = '';
+                                                        return StatefulBuilder(
+                                                          builder: (context, setStateDialog) {
+                                                            final filteredSessions = _chatSessions.where((s) {
+                                                              final title = (s['title'] as String? ?? 'Conversation').toLowerCase();
+                                                              return title.contains(searchQuery.toLowerCase());
+                                                            }).toList();
+
+                                                            return AlertDialog(
+                                                              backgroundColor: AppColors.surface,
+                                                              shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                                                              title: Text(
+                                                                'Chat History',
+                                                                style: GoogleFonts.inter(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600),
+                                                              ),
+                                                              content: Container(
+                                                                width: 500,
+                                                                constraints: const BoxConstraints(maxHeight: 500),
+                                                                child: Column(
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  children: [
+                                                                    TextField(
+                                                                      onChanged: (val) => setStateDialog(() => searchQuery = val),
+                                                                      style: GoogleFonts.inter(color: AppColors.textPrimary, fontSize: 13),
+                                                                      cursorColor: Colors.white,
+                                                                      decoration: InputDecoration(
+                                                                        hintText: 'Search history...',
+                                                                        hintStyle: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13),
+                                                                        prefixIcon: const Icon(Icons.search, size: 16, color: AppColors.textSecondary),
+                                                                        filled: true,
+                                                                        fillColor: AppColors.background,
+                                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                                                        border: const OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide.none),
+                                                                        focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: Colors.white, width: 1)),
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(height: 16),
+                                                                    Expanded(
+                                                                      child: filteredSessions.isEmpty
+                                                                          ? Center(
+                                                                              child: Text('No matching sessions', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13)),
+                                                                            )
+                                                                          : ListView.separated(
+                                                                              shrinkWrap: true,
+                                                                              itemCount: filteredSessions.length,
+                                                                              separatorBuilder: (context, index) => const Divider(height: 1, color: AppColors.panelBorder),
+                                                                              itemBuilder: (context, index) {
+                                                                                final session = filteredSessions[index];
+                                                                                final isActive = session['id'] == _activeSessionId;
+                                                                                return StatefulBuilder(
+                                                                                  builder: (context, setTileState) {
+                                                                                    bool isHovered = false;
+                                                                                    final isWhiteBg = isActive || isHovered;
+                                                                                    return MouseRegion(
+                                                                                      onEnter: (_) => setTileState(() => isHovered = true),
+                                                                                      onExit: (_) => setTileState(() => isHovered = false),
+                                                                                      cursor: SystemMouseCursors.click,
+                                                                                      child: GestureDetector(
+                                                                                        onTap: () {
+                                                                                          Navigator.of(context).pop();
+                                                                                          setState(() => _activeSessionId = session['id'] as String?);
+                                                                                          if (session['id'] != null) {
+                                                                                            _loadSessionHistory(session['id'] as String);
+                                                                                          }
+                                                                                        },
+                                                                                        child: Container(
+                                                                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                                                                          decoration: BoxDecoration(
+                                                                                            color: isWhiteBg ? Colors.white : Colors.transparent,
+                                                                                            borderRadius: BorderRadius.zero,
+                                                                                          ),
+                                                                                          child: Text(
+                                                                                            session['title'] as String? ?? 'Conversation',
+                                                                                            style: GoogleFonts.inter(
+                                                                                              color: isWhiteBg ? Colors.black : AppColors.textPrimary,
+                                                                                              fontSize: 13,
+                                                                                              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                                                                                            ),
+                                                                                            maxLines: 1,
+                                                                                            overflow: TextOverflow.ellipsis,
+                                                                                          ),
+                                                                                        ),
+                                                                                      ),
+                                                                                    );
+                                                                                  },
+                                                                                );
+                                                                              },
+                                                                            ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                              actions: [
+                                                                TextButton(
+                                                                  style: TextButton.styleFrom(
+                                                                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                                                                    foregroundColor: AppColors.textSecondary,
+                                                                  ),
+                                                                  onPressed: () => Navigator.of(context).pop(),
+                                                                  child: const Text('Close'),
+                                                                ),
+                                                              ],
+                                                            );
+                                                          },
+                                                        );
+                                                      },
+                                                    );
+                                                  },
+                                                  borderRadius: BorderRadius.zero,
+                                                  child: const Padding(
+                                                    padding: EdgeInsets.all(4.0),
+                                                    child: Icon(Icons.history, size: 14, color: AppColors.textSecondary),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Tooltip(
+                                                message: 'Close Panel',
+                                                child: InkWell(
+                                                  onTap: () => setState(() => _isAiExpanded = false),
+                                                  borderRadius: BorderRadius.zero,
+                                                  child: const Padding(
+                                                    padding: EdgeInsets.all(4.0),
+                                                    child: Icon(
+                                                      Icons.close,
+                                                      size: 14,
+                                                      color: AppColors.textSecondary,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const Divider(height: 1),
+                                        Expanded(
+                                          child: IdeChatPanel(
+                                            activeSessionId: _activeSessionId,
+                                            chatSessions: _chatSessions,
+                                            isGenerating: _isGenerating,
+                                            onSessionSelected: (id) {
+                                              setState(() {
+                                                _activeSessionId = id;
+                                              });
+                                              _loadSessionHistory(id);
+                                            },
+                                            onNewChat: () {
+                                              setState(() {
+                                                _activeSessionId = null;
+                                                _aiChatHistory.clear();
+                                                _aiReasoningTokenStream = '';
+                                              });
+                                            },
+                                            chatHistory: _aiChatHistory,
+                                            streamingText:
+                                                _aiReasoningTokenStream,
+                                            currentTurnActions:
+                                                _currentTurnActions,
+                                            onSendPrompt: _sendAiPrompt,
+                                            onApplyActions: (_) {},
+                                            onStop: _handleStopAi,
+                                            workingStatus: _aiWorkingStatus,
+                                            tokenUsage: _totalTokenUsage,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
-                              child: PropertiesPanel(
-                                selectedComponent:
-                                    _selectedComponentIds.length == 1
-                                    ? _components.firstWhere(
-                                        (c) =>
-                                            c.id == _selectedComponentIds.first,
-                                      )
-                                    : null,
-                                onComponentUpdate: _onComponentPropertyUpdate,
-                              ),
-                            ),
-                            if (_isPropertiesExpanded && _isAiExpanded)
-                              const Divider(height: 1),
-                            _buildSidebarPanel(
-                              title: 'AI AGENT',
-                              isExpanded: _isAiExpanded,
-                              onToggle: () => setState(
-                                () => _isAiExpanded = !_isAiExpanded,
-                              ),
-                              child: IdeChatPanel(
-                                activeSessionId: _activeSessionId,
-                                chatSessions: _chatSessions,
-                                isGenerating: _isGenerating,
-                                onSessionSelected: (id) {
-                                  setState(() {
-                                    _activeSessionId = id;
-                                  });
-                                  _loadSessionHistory(id);
-                                },
-                                onNewChat: () {
-                                  setState(() {
-                                    _activeSessionId = null;
-                                    _aiChatHistory.clear();
-                                    _aiReasoningTokenStream = '';
-                                  });
-                                },
-                                chatHistory: _aiChatHistory,
-                                streamingText: _aiReasoningTokenStream,
-                                currentTurnActions: _currentTurnActions,
-                                onSendPrompt: _sendAiPrompt,
-                                onApplyActions:
-                                    (
-                                      _,
-                                    ) {}, // Deprecated: Actions applied autonomously
-                                onStop: _handleStopAi,
-                                workingStatus: _aiWorkingStatus,
-                                tokenUsage: _totalTokenUsage,
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
                     ],
                   ),
                 ),
-                MouseRegion(
-                  cursor: SystemMouseCursors.resizeUpDown,
-                  child: GestureDetector(
-                    onVerticalDragUpdate: (details) {
-                      setState(() {
-                        _bottomPanelHeight =
-                            (_bottomPanelHeight - details.delta.dy).clamp(
-                              100.0,
-                              500.0,
-                            );
-                      });
-                    },
-                    child: Container(
-                      height: 4,
-                      color: Colors.transparent,
-                      child: Center(
-                        child: Container(
-                          height: 2,
-                          width: 30,
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceVariant,
-                            borderRadius: BorderRadius.circular(2),
+                if (_isSimulationExpanded) ...[
+                  MouseRegion(
+                    cursor: SystemMouseCursors.resizeUpDown,
+                    child: GestureDetector(
+                      onVerticalDragUpdate: (details) {
+                        setState(() {
+                          _bottomPanelHeight =
+                              (_bottomPanelHeight - details.delta.dy).clamp(
+                                100.0,
+                                500.0,
+                              );
+                        });
+                      },
+                      child: Container(
+                        height: 4,
+                        color: Colors.transparent,
+                        child: Center(
+                          child: Container(
+                            height: 2,
+                            width: 30,
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceVariant,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                // bottom bar - simulation
-                SizedBox(
-                  height: _isSimulationExpanded ? _bottomPanelHeight : null,
-                  child: PanelContainer(
-                    title: 'Simulation',
-                    isExpanded: _isSimulationExpanded,
-                    onToggle: () => setState(
-                      () => _isSimulationExpanded = !_isSimulationExpanded,
+                  SizedBox(
+                    height: _bottomPanelHeight,
+                    child: SimulationPanel(
+                      simulationTabIndex: _simulationTabIndex,
+                      componentMetrics: _componentMetrics,
+                      components: _components,
+                      timeSeriesData: _timeSeriesData,
+                      hoveredComponentId: _hoveredComponentId,
+                      onTabChanged: (index) =>
+                          setState(() => _simulationTabIndex = index),
+                      onHoverComponent: (id) =>
+                          setState(() => _hoveredComponentId = id),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _simulationStatus,
-                            style: TextStyle(
-                              color: _simulationStatus.startsWith('Error')
-                                  ? AppColors.error
-                                  : AppColors.secondary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Expanded(
-                            child: _buildDampenedScrollView(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (_nodeVoltages.isNotEmpty &&
-                                      !_simulationStatus.startsWith(
-                                        'Error',
-                                      )) ...[
-                                    const Text(
-                                      'Node Voltages:',
-                                      style: TextStyle(
-                                        color: AppColors.textPrimary,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 8,
-                                      children: _nodeVoltages.entries.map((e) {
-                                        final parts = e.key.split(':');
-                                        final compId = parts.isNotEmpty
-                                            ? parts[0]
-                                            : '';
-                                        final isHovered =
-                                            compId == _hoveredComponentId;
-
-                                        return MouseRegion(
-                                          onEnter: (_) => setState(
-                                            () => _hoveredComponentId = compId,
-                                          ),
-                                          onExit: (_) => setState(
-                                            () => _hoveredComponentId = null,
-                                          ),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 10,
-                                              vertical: 6,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: isHovered
-                                                  ? AppColors.selection
-                                                        .withValues(alpha: 0.2)
-                                                  : AppColors.surface,
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                              border: Border.all(
-                                                color: isHovered
-                                                    ? AppColors.primary
-                                                    : AppColors.panelBorder,
-                                              ),
-                                            ),
-                                            child: Text(
-                                              'Node ${_formatNodeKey(e.key)}: ${e.value.toStringAsFixed(3)} V',
-                                              style: TextStyle(
-                                                color: isHovered
-                                                    ? AppColors.primary
-                                                    : AppColors.textPrimary,
-                                                fontFamily: 'monospace',
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      }).toList(),
-                                    ),
-                                  ],
-                                  if (_componentMetrics.isNotEmpty &&
-                                      !_simulationStatus.startsWith(
-                                        'Error',
-                                      )) ...[
-                                    const SizedBox(height: 24),
-                                    const Text(
-                                      'Component Metrics:',
-                                      style: TextStyle(
-                                        color: AppColors.textPrimary,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 8,
-                                      children: _componentMetrics.entries.map((
-                                        e,
-                                      ) {
-                                        final compId = e.key;
-                                        final metrics = e.value;
-                                        final comp = _components.firstWhere(
-                                          (c) => c.id == compId,
-                                        );
-                                        final isHovered =
-                                            compId == _hoveredComponentId;
-
-                                        String details =
-                                            'Vd: ${metrics["voltageDrop"]?.toStringAsFixed(3) ?? "0"} V';
-                                        if (metrics.containsKey("current")) {
-                                          // Convert current to mA for better readability if small
-                                          double current = (metrics["current"] as num?)?.toDouble() ?? 0.0;
-                                          String currentStr = current < 1
-                                              ? '${(current * 1000).toStringAsFixed(2)} mA'
-                                              : '${current.toStringAsFixed(3)} A';
-                                          details += '\nI: $currentStr';
-                                        }
-                                        if (metrics.containsKey("power")) {
-                                          double power = (metrics["power"] as num?)?.toDouble() ?? 0.0;
-                                          String powerStr = power < 1
-                                              ? '${(power * 1000).toStringAsFixed(2)} mW'
-                                              : '${power.toStringAsFixed(3)} W';
-                                          details += '\nP: $powerStr';
-                                        }
-
-                                        return MouseRegion(
-                                          onEnter: (_) => setState(
-                                            () => _hoveredComponentId = compId,
-                                          ),
-                                          onExit: (_) => setState(
-                                            () => _hoveredComponentId = null,
-                                          ),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 10,
-                                              vertical: 6,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: isHovered
-                                                  ? AppColors.selection
-                                                        .withValues(alpha: 0.2)
-                                                  : AppColors.surface,
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                              border: Border.all(
-                                                color: isHovered
-                                                    ? AppColors.primary
-                                                    : AppColors.panelBorder,
-                                              ),
-                                            ),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  comp.label,
-                                                  style: TextStyle(
-                                                    color: isHovered
-                                                        ? AppColors.primary
-                                                        : AppColors.textPrimary,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 13,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  details,
-                                                  style: TextStyle(
-                                                    color: isHovered
-                                                        ? AppColors.primary
-                                                        : AppColors
-                                                              .textSecondary,
-                                                    fontFamily: 'monospace',
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      }).toList(),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  ),
+                ],
+                // bottom bar - fixed simulation toolbar
+                SimulationBottomToolbar(
+                  simulationStatus: _simulationStatus,
+                  isSimulationExpanded: _isSimulationExpanded,
+                  hasDesignErrors: _hasDesignErrors,
+                  simulationConfig: _simulationConfig,
+                  onConfigChanged: (config) {
+                    setState(() {
+                      _simulationConfig = config;
+                      // if user selects tran or ac, automatically expand the panel to show graphs
+                      if (config['type'] == 'tran' || config['type'] == 'ac') {
+                        _isSimulationExpanded = true;
+                        _simulationTabIndex = 0; // Waveform Graph tab
+                      }
+                    });
+                    _scheduleSimulation(isManual: config['type'] != 'op');
+                  },
+                  onStop: () {
+                    _debounceTimer?.cancel();
+                    setState(() {
+                      _simulationStatus = 'Ready';
+                      _nodeVoltages.clear();
+                      _componentMetrics.clear();
+                      _timeSeriesData.clear();
+                    });
+                  },
+                  onRun: () {
+                    setState(() => _isSimulationExpanded = true);
+                    _scheduleSimulation(isManual: true);
+                  },
+                  onToggleExpand: () => setState(
+                    () => _isSimulationExpanded = !_isSimulationExpanded,
                   ),
                 ),
               ],
@@ -1275,458 +1343,89 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisSize: MainAxisSize.min,
                 children: _notifications
-                    .map((n) => _buildNotificationCard(n))
+                    .map(
+                      (n) => NotificationCard(
+                        notification: n,
+                        onDismiss: () {
+                          setState(() {
+                            _notifications.removeWhere(
+                              (item) => item.id == n.id,
+                            );
+                          });
+                        },
+                      ),
+                    )
                     .toList(),
               ),
             ),
+            // Floating Canvas Tools
+            Positioned(
+              left: (_isLeftPanelOpen ? AppConstants.sidebarWidth : 0) + 60,
+              top: 0,
+              bottom: _isSimulationExpanded ? _bottomPanelHeight + 48 : 44,
+              child: Center(
+                child: FloatingToolbar(
+                  activeTool: _activeTool,
+                  hasUndo: _undoStack.isNotEmpty,
+                  hasSelection:
+                      _selectedComponentIds.isNotEmpty ||
+                      _selectedWireIds.isNotEmpty,
+                  setTool: _setTool,
+                  onUndo: _handleUndo,
+                  onDelete: _deleteSelected,
+                  onRotateLeft: () => _rotateSelected(-90),
+                  onRotateRight: () => _rotateSelected(90),
+                  onZoomIn: () {
+                    _setTool('ZOOM_IN');
+                    _zoom(AppConstants.zoomStep);
+                  },
+                  onZoomOut: () {
+                    _setTool('ZOOM_OUT');
+                    _zoom(-AppConstants.zoomStep);
+                  },
+                  onResetZoom: () {
+                    _setTool('SELECT');
+                    _resetZoom();
+                  },
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNotificationCard(IdeNotification notif) {
-    return Container(
-      width: 320,
-      margin: const EdgeInsets.only(top: 8),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: notif.type == 'error'
-              ? AppColors.error.withValues(alpha: 0.5)
-              : AppColors.primary.withValues(alpha: 0.5),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                notif.type == 'error'
-                    ? Icons.error_outline
-                    : Icons.info_outline,
-                color: notif.type == 'error'
-                    ? AppColors.error
-                    : AppColors.primary,
-                size: 18,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      notif.type == 'error' ? 'Error' : 'Notification',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      notif.message,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                        height: 1.4,
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () {
-                  setState(() {
-                    _notifications.removeWhere((n) => n.id == notif.id);
-                  });
-                },
-                child: const Icon(
-                  Icons.close,
-                  size: 16,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDrawer(BuildContext context) {
-    return Drawer(
-      backgroundColor: AppColors.surface,
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(color: AppColors.surfaceVariant),
-            child: Text(
-              'ECS AI',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: AppColors.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(
-              Icons.folder_open_outlined,
-              color: AppColors.textPrimary,
-            ),
-            title: const Text(
-              'Open Project',
-              style: TextStyle(color: AppColors.textPrimary),
-            ),
-            onTap: () {
-              Navigator.pop(context); // close drawer
-            },
-          ),
-          ListTile(
-            leading: const Icon(
-              Icons.save_outlined,
-              color: AppColors.textPrimary,
-            ),
-            title: const Text(
-              'Save Project',
-              style: TextStyle(color: AppColors.textPrimary),
-            ),
-            onTap: () {
-              Navigator.pop(context); // close drawer
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToolbar(BuildContext context) {
-    return Container(
-      height: AppConstants.toolbarHeight,
-      color: AppColors.surfaceVariant,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          // hamburger menu & title
-          Builder(
-            builder: (ctx) => IconButton(
-              icon: const Icon(Icons.menu, color: AppColors.textPrimary),
-              onPressed: () => Scaffold.of(ctx).openDrawer(),
-              splashRadius: 20,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'ECS AI',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
-            ),
-          ),
-
-          const Spacer(), // push actions to center
-          // center toolbar actions
-          _toolbarButton(
-            context,
-            Icons.near_me_outlined,
-            'Select',
-            () => _setTool('SELECT'),
-            isActive: _activeTool == 'SELECT',
-          ),
-          _toolbarButton(
-            context,
-            Icons.pan_tool_outlined,
-            'Pan',
-            () => _setTool('PAN'),
-            isActive: _activeTool == 'PAN',
-          ),
-          _toolbarButton(
-            context,
-            Icons.timeline, // icon that looks like a line/wire
-            'Wire',
-            () => _setTool('WIRE'),
-            isActive: _activeTool == 'WIRE',
-          ),
-          const VerticalDivider(indent: 10, endIndent: 10),
-          Opacity(
-            opacity: _undoStack.isEmpty ? 0.5 : 1.0,
-            child: _toolbarButton(
-              context,
-              Icons.undo_outlined,
-              'Undo AI Action',
-              _undoStack.isEmpty ? () {} : _handleUndo,
-              isActive: false,
-            ),
-          ),
-          const VerticalDivider(indent: 10, endIndent: 10),
-          _toolbarButton(context, Icons.zoom_in, 'Zoom In', () {
-            _setTool('ZOOM_IN');
-            _zoom(AppConstants.zoomStep);
-          }, isActive: _activeTool == 'ZOOM_IN'),
-          _toolbarButton(context, Icons.zoom_out, 'Zoom Out', () {
-            _setTool('ZOOM_OUT');
-            _zoom(-AppConstants.zoomStep);
-          }, isActive: _activeTool == 'ZOOM_OUT'),
-          _toolbarButton(context, Icons.fit_screen_outlined, 'Fit', () {
-            _setTool('SELECT');
-            _resetZoom();
-          }),
-
-          const SizedBox(width: 16),
-          // active tool indicator
-          _buildToolIndicator(),
-
-          const Spacer(), // push sim controls to right
-          // simulation controls
-          _buildSimButton(
-            context,
-            Icons.play_arrow_rounded,
-            'Run',
-            AppColors.secondary,
-            _scheduleSimulation,
-          ),
-          _buildSimButton(
-            context,
-            Icons.stop_rounded,
-            'Stop',
-            AppColors.error,
-            () {
-              _debounceTimer?.cancel();
-              setState(() {
-                _simulationStatus = 'Ready';
-                _nodeVoltages.clear();
-                _componentMetrics.clear();
-              });
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToolIndicator() {
-    final label = _activeTool.replaceAll('_', ' ');
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(_getToolIcon(_activeTool), size: 14, color: AppColors.primary),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
+  Widget _buildPropertiesPanel() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          height: AppConstants.panelHeaderHeight,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          color: AppColors.surfaceVariant,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'PROPERTIES',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              letterSpacing: 1.2,
               fontWeight: FontWeight.w600,
-              color: AppColors.primary,
-              letterSpacing: 0.8,
+              color: AppColors.textPrimary,
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  IconData _getToolIcon(String tool) {
-    if (tool.startsWith('PLACE_')) return Icons.add_circle_outline;
-    return switch (tool) {
-      'ZOOM_IN' => Icons.zoom_in,
-      'ZOOM_OUT' => Icons.zoom_out,
-      'PAN' => Icons.pan_tool_outlined,
-      _ => Icons.near_me_outlined,
-    };
-  }
-
-  Widget _toolbarButton(
-    BuildContext context,
-    IconData icon,
-    String tooltip,
-    VoidCallback onTap, {
-    bool isActive = false,
-  }) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(4),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          decoration: isActive
-              ? BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(4),
-                )
-              : null,
-          child: Icon(
-            icon,
-            size: 18,
-            color: isActive ? AppColors.primary : AppColors.textSecondary,
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: PropertiesPanel(
+            selectedComponent: _selectedComponentIds.length == 1
+                ? _components.firstWhereOrNull(
+                    (c) => c.id == _selectedComponentIds.first,
+                  )
+                : null,
+            onComponentUpdate: _onComponentPropertyUpdate,
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildSimButton(
-    BuildContext context,
-    IconData icon,
-    String label,
-    Color color,
-    VoidCallback onPressed,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: TextButton.icon(
-        onPressed: onPressed,
-        style: TextButton.styleFrom(
-          foregroundColor: color,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
-            side: BorderSide(color: color.withValues(alpha: 0.3)),
-          ),
-        ),
-        icon: Icon(icon, size: 18),
-        label: Text(label, style: const TextStyle(fontSize: 12)),
-      ),
-    );
-  }
-
-  Widget _buildComponentLibrary() {
-    final grouped = <ComponentCategory, List<ComponentType>>{};
-    for (final type in ComponentType.values) {
-      grouped.putIfAbsent(type.category, () => []).add(type);
-    }
-
-    return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      children: grouped.entries.map((entry) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    entry.key.name.toUpperCase(),
-                    style: GoogleFonts.inter(
-                      color: AppColors.textSecondary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    height: 1,
-                    color: AppColors.panelBorder.withValues(alpha: 0.5),
-                  ),
-                ],
-              ),
-            ),
-            ...entry.value.map((type) => _buildLibraryItem(type)),
-            const SizedBox(height: 4),
-          ],
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildLibraryItem(ComponentType type) {
-    final isSelected = _activeTool == 'PLACE_${type.name.toUpperCase()}';
-    return MouseRegion(
-      cursor: SystemMouseCursors.grab,
-      child: InkWell(
-        onTap: () => _selectComponentToPlace(type),
-        hoverColor: AppColors.surfaceVariant.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? AppColors.primary.withValues(alpha: 0.15)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: isSelected
-                  ? AppColors.primary.withValues(alpha: 0.3)
-                  : Colors.transparent,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary.withValues(alpha: 0.2) : AppColors.surface,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: isSelected ? AppColors.primary.withValues(alpha: 0.5) : AppColors.panelBorder,
-                  ),
-                ),
-                child: SvgPicture.asset(
-                  type.iconPath,
-                  width: 20,
-                  height: 20,
-                  colorFilter: const ColorFilter.mode(
-                    AppColors.primary,
-                    BlendMode.srcIn,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  type.label,
-                  style: GoogleFonts.inter(
-                    color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                    fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  ),
-                ),
-              ),
-              if (isSelected)
-                const Icon(
-                  Icons.check,
-                  size: 16,
-                  color: AppColors.primary,
-                )
-              else
-                Icon(
-                  Icons.drag_indicator,
-                  size: 16,
-                  color: AppColors.textSecondary.withValues(alpha: 0.3),
-                ),
-            ],
-          ),
-        ),
-      ),
+      ],
     );
   }
 }

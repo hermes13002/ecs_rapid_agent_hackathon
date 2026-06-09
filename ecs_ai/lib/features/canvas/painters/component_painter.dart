@@ -412,30 +412,63 @@ class ComponentPainter extends CustomPainter {
       fontSize: 10,
     );
     
-    if (metrics != null) {
-      double current = (metrics["current"] as num?)?.toDouble() ?? 0.0;
-      double power = (metrics["power"] as num?)?.toDouble() ?? 0.0;
-      
-      String metricsStr = '';
-      if (current != 0) {
-        String currentStr = current < 1 ? '${(current * 1000).toStringAsFixed(2)}mA' : '${current.toStringAsFixed(3)}A';
-        metricsStr += '$currentStr ';
-      }
-      if (power != 0) {
-        String powerStr = power < 1 ? '${(power * 1000).toStringAsFixed(2)}mW' : '${power.toStringAsFixed(3)}W';
-        metricsStr += powerStr;
-      }
-      
-      if (metricsStr.isNotEmpty) {
-        _drawText(
-          canvas,
-          metricsStr.trim(),
-          component.position + Offset(0, grid * 2.5),
-          Colors.green,
-          fontSize: 10,
-        );
-      }
+    if (isHovered && metrics != null) {
+      _drawHoverTooltip(canvas, component.position + Offset(grid * 2, -grid * 2), metrics);
     }
+  }
+
+  void _drawHoverTooltip(Canvas canvas, Offset position, Map<String, dynamic> metrics) {
+    double voltage = (metrics["voltageDrop"] as num?)?.toDouble() ?? 0.0;
+    double current = (metrics["current"] as num?)?.toDouble() ?? 0.0;
+    double power = (metrics["power"] as num?)?.toDouble() ?? 0.0;
+
+    String vStr = '${voltage.toStringAsFixed(2)} V';
+    String iStr = '${(current * 1000).toStringAsFixed(2)} mA';
+    String pStr = '${(power * 1000).toStringAsFixed(2)} mW';
+
+    final textStyle = const TextStyle(
+      color: AppColors.textPrimary,
+      fontSize: 11,
+      fontFamily: 'JetBrains Mono',
+      fontWeight: FontWeight.w500,
+    );
+    final labelStyle = TextStyle(
+      color: AppColors.textSecondary.withValues(alpha: 0.8),
+      fontSize: 10,
+      fontFamily: 'JetBrains Mono',
+      fontWeight: FontWeight.bold,
+    );
+
+    final spans = [
+      TextSpan(text: 'V ', style: labelStyle), TextSpan(text: '$vStr\n', style: textStyle),
+      TextSpan(text: 'I ', style: labelStyle), TextSpan(text: '$iStr\n', style: textStyle),
+      TextSpan(text: 'P ', style: labelStyle), TextSpan(text: pStr, style: textStyle),
+    ];
+
+    final textPainter = TextPainter(
+      text: TextSpan(children: spans),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+
+    const padding = EdgeInsets.all(8.0);
+    final width = textPainter.width + padding.horizontal;
+    final height = textPainter.height + padding.vertical;
+    final rect = Rect.fromLTWH(position.dx, position.dy, width, height);
+
+    final bgPaint = Paint()
+      ..color = AppColors.surfaceVariant.withValues(alpha: 0.95)
+      ..style = PaintingStyle.fill;
+    final borderPaint = Paint()
+      ..color = AppColors.panelBorder
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    final rRect = RRect.fromRectAndRadius(rect, const Radius.circular(6));
+    canvas.drawRRect(rRect, bgPaint);
+    canvas.drawRRect(rRect, borderPaint);
+
+    textPainter.paint(canvas, position + padding.topLeft);
   }
 
   void _drawText(

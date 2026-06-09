@@ -19,7 +19,7 @@ abstract final class AppConstants {
   static const double canvasHeight = 3000.0;
 
   // -- layout --
-  static const double sidebarWidth = 260.0;
+  static const double sidebarWidth = 220.0;
   static const double toolbarHeight = 44.0;
   static const double bottomBarHeight = 180.0;
   static const double panelHeaderHeight = 36.0;
@@ -30,11 +30,11 @@ abstract final class AppConstants {
 
 /// global configuration for api connections
 abstract final class ApiConstants {
-  // IMPORTANT: For local development, use localhost. 
-  // For production deployment, replace these with your actual Render URL.
-  // e.g., 'https://ecs-ai-backend.onrender.com'
-  // e.g., 'wss://ecs-ai-backend.onrender.com'
-  
+  // IMPORTANT: For local development, use localhost.
+
+  // static const String baseUrl = 'https://ecs-rapid-agent-hackathon-609652852189.africa-south1.run.app';
+  // static const String wsUrl = 'wss://ecs-rapid-agent-hackathon-609652852189.africa-south1.run.app';
+
   static const String baseUrl = 'https://ecs-ai-9ywk.onrender.com';
   static const String wsUrl = 'wss://ecs-ai-9ywk.onrender.com';
 }

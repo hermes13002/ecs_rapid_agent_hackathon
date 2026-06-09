@@ -87,12 +87,12 @@ class _AiChatPanelState extends State<AiChatPanel> {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: isUser
-                        ? AppColors.primary.withValues(alpha: 0.1)
+                        ? Colors.white.withValues(alpha: 0.1)
                         : AppColors.surfaceVariant,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: isUser
-                          ? AppColors.primary.withValues(alpha: 0.2)
+                          ? Colors.white.withValues(alpha: 0.2)
                           : AppColors.surfaceVariant,
                     ),
                   ),
@@ -106,7 +106,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
                         builders: {
                           'latex': LatexElementBuilder(
                             textStyle: TextStyle(
-                              color: isUser ? AppColors.primary : AppColors.textPrimary,
+                              color: isUser ? Colors.white : AppColors.textPrimary,
                               fontSize: 13,
                             ),
                           ),
@@ -118,11 +118,11 @@ class _AiChatPanelState extends State<AiChatPanel> {
                         styleSheet: MarkdownStyleSheet(
                           p: TextStyle(
                             fontSize: 12,
-                            color: isUser ? AppColors.primary : AppColors.textPrimary,
+                            color: isUser ? Colors.white : AppColors.textPrimary,
                           ),
                           code: const TextStyle(
                             fontSize: 12,
-                            color: AppColors.primary,
+                            color: Colors.white,
                             backgroundColor: AppColors.surface,
                           ),
                           codeblockDecoration: BoxDecoration(
@@ -162,8 +162,8 @@ class _AiChatPanelState extends State<AiChatPanel> {
                                   icon: const Icon(Icons.build_circle, size: 16),
                                   label: const Text('Apply Circuit Fix'),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.primary,
-                                    foregroundColor: AppColors.surface,
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: Colors.black,
                                     textStyle: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
@@ -215,7 +215,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(4),
-                      borderSide: const BorderSide(color: AppColors.primary),
+                      borderSide: const BorderSide(color: Colors.white),
                     ),
                   ),
                   onSubmitted: (_) => _handleSend(),
@@ -225,7 +225,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
               IconButton(
                 onPressed: _handleSend,
                 icon: const Icon(Icons.send_rounded, size: 16),
-                color: AppColors.primary,
+                color: Colors.white,
                 splashRadius: 16,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),

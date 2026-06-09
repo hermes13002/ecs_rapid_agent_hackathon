@@ -98,6 +98,7 @@ class NetlistResolver {
     List<CircuitComponent> components,
     List<CircuitWire> wires, {
     List<Map<String, String>> chatHistory = const [],
+    Map<String, dynamic>? simulationConfig,
   }) {
     final nets = resolve(components, wires);
     return {
@@ -105,6 +106,7 @@ class NetlistResolver {
       'wires': wires.map((w) => w.toJson()).toList(),
       'nets': nets.map((n) => n.toJson()).toList(),
       'chatHistory': chatHistory,
+      if (simulationConfig != null) 'simulation_config': simulationConfig,
     };
   }
 
@@ -113,8 +115,9 @@ class NetlistResolver {
     List<CircuitComponent> components,
     List<CircuitWire> wires, {
     List<Map<String, String>> chatHistory = const [],
+    Map<String, dynamic>? simulationConfig,
   }) {
-    final schematic = serializeSchematic(components, wires, chatHistory: chatHistory);
+    final schematic = serializeSchematic(components, wires, chatHistory: chatHistory, simulationConfig: simulationConfig);
     final compSize = AppConstants.gridSize * 3; // bounding rect formula
 
     // occupied bounding boxes
