@@ -1,3 +1,4 @@
+import 'package:ecs_ai/features/canvas/widgets/unit_input_field.dart';
 import 'package:flutter/material.dart';
 import 'package:ecs_ai/app/theme/app_colors.dart';
 
@@ -25,6 +26,24 @@ class SimulationBottomToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isSimError = simulationStatus.startsWith('Error:');
+    final hasAnyError = hasDesignErrors || isSimError;
+    
+    String errorText = 'No Design Errors';
+    String fullErrorText = 'Circuit is ready for simulation.';
+    
+    if (hasDesignErrors) {
+      errorText = 'Design Errors';
+      fullErrorText = 'There are logic or schematic design errors.';
+    } else if (isSimError) {
+      String msg = simulationStatus.replaceFirst('Error: ', '');
+      fullErrorText = msg;
+      if (msg.length > 50) {
+        msg = '${msg.substring(0, 50)}...';
+      }
+      errorText = 'Sim Error: $msg';
+    }
+
     return Container(
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -36,18 +55,25 @@ class SimulationBottomToolbar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(
-            hasDesignErrors ? Icons.warning_amber_rounded : Icons.check_circle_outline,
-            color: hasDesignErrors ? AppColors.error : Colors.white,
-            size: 18,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            hasDesignErrors ? 'Design Errors' : 'No Design Errors',
-            style: TextStyle(
-              color: hasDesignErrors ? AppColors.error : Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
+          Tooltip(
+            message: fullErrorText,
+            child: Row(
+              children: [
+                Icon(
+                  hasAnyError ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                  color: hasAnyError ? AppColors.error : Colors.white,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  errorText,
+                  style: TextStyle(
+                    color: hasAnyError ? AppColors.error : Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
           const Spacer(),
@@ -387,17 +413,17 @@ class _SimulationSettingsModalState extends State<_SimulationSettingsModal> {
         if (type == 'tran') ...[
           Text('Transient Settings', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.primary)),
           const SizedBox(height: 12),
-          _buildInputRow('Stop Time', _stopCtrl, 'e.g. 100ms'),
+          _buildInputRow('Stop Time', _stopCtrl, 'e.g. 100ms', allowedUnits: const ['', 's', 'ms', 'us', 'ns']),
           const SizedBox(height: 12),
-          _buildInputRow('Time Step', _stepCtrl, 'e.g. 1ms'),
+          _buildInputRow('Time Step', _stepCtrl, 'e.g. 1ms', allowedUnits: const ['', 's', 'ms', 'us', 'ns']),
         ] else if (type == 'ac') ...[
           Text('AC Sweep Settings', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.primary)),
           const SizedBox(height: 12),
           _buildInputRow('Points/Decade', _ptsCtrl, 'e.g. 10'),
           const SizedBox(height: 12),
-          _buildInputRow('Start Freq', _fstartCtrl, 'e.g. 1'),
+          _buildInputRow('Start Freq', _fstartCtrl, 'e.g. 1', allowedUnits: const ['', 'Hz', 'kHz', 'MHz', 'GHz']),
           const SizedBox(height: 12),
-          _buildInputRow('Stop Freq', _fstopCtrl, 'e.g. 100k'),
+          _buildInputRow('Stop Freq', _fstopCtrl, 'e.g. 100k', allowedUnits: const ['', 'Hz', 'kHz', 'MHz', 'GHz']),
         ] else ...[
           const Text('No additional settings required for OP.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
         ]
@@ -440,7 +466,7 @@ class _SimulationSettingsModalState extends State<_SimulationSettingsModal> {
     );
   }
 
-  Widget _buildInputRow(String label, TextEditingController controller, String hint) {
+  Widget _buildInputRow(String label, TextEditingController controller, String hint, {List<String>? allowedUnits}) {
     return Row(
       children: [
         Expanded(
@@ -449,23 +475,29 @@ class _SimulationSettingsModalState extends State<_SimulationSettingsModal> {
         ),
         Expanded(
           flex: 3,
-          child: SizedBox(
-            height: 36,
-            child: TextField(
-              controller: controller,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: hint,
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                filled: true,
-                fillColor: AppColors.surface,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.panelBorder)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.panelBorder)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.primary)),
-              ),
-            ),
-          ),
+          child: allowedUnits != null
+              ? UnitInputField(
+                  label: '',
+                  controller: controller,
+                  allowedUnits: allowedUnits,
+                )
+              : SizedBox(
+                  height: 36,
+                  child: TextField(
+                    controller: controller,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: hint,
+                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                      filled: true,
+                      fillColor: AppColors.surface,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.panelBorder)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.panelBorder)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.primary)),
+                    ),
+                  ),
+                ),
         ),
       ],
     );

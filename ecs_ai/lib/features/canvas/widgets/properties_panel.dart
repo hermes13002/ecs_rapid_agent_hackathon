@@ -2,6 +2,7 @@ import 'package:ecs_ai/core/models/component_type.dart';
 import 'package:flutter/material.dart';
 import 'package:ecs_ai/app/theme/app_colors.dart';
 import 'package:ecs_ai/core/models/circuit_component.dart';
+import 'unit_input_field.dart';
 
 enum SourceType { dc, ac, transient }
 
@@ -59,7 +60,7 @@ class _PropertiesPanelState extends State<PropertiesPanel> {
     if (v.contains('SINE') || v.contains('PULSE')) {
       _sourceMode = SourceType.transient;
       _tranType = v.contains('SINE') ? 'SINE' : 'PULSE';
-      
+
       final regex = RegExp(r'(SINE|PULSE)\((.*?)\)');
       final match = regex.firstMatch(v);
       if (match != null) {
@@ -68,11 +69,10 @@ class _PropertiesPanelState extends State<PropertiesPanel> {
         if (parts.length > 1) _tranAmpCtrl.text = parts[1];
         if (parts.length > 2) _tranFreqCtrl.text = parts[2];
       }
-      
+
       final acRegex = RegExp(r'AC\s+([\d\.]+)');
       final acMatch = acRegex.firstMatch(v);
       if (acMatch != null) _acMagCtrl.text = acMatch.group(1)!;
-
     } else if (v.contains('AC')) {
       _sourceMode = SourceType.ac;
       final regex = RegExp(r'AC\s+([\d\.]+)(\s+([\d\.]+))?');
@@ -88,7 +88,7 @@ class _PropertiesPanelState extends State<PropertiesPanel> {
       if (match != null) {
         _dcValueCtrl.text = match.group(1)!;
       } else {
-        _dcValueCtrl.text = value; 
+        _dcValueCtrl.text = value;
       }
     }
   }
@@ -101,7 +101,8 @@ class _PropertiesPanelState extends State<PropertiesPanel> {
       }
       if (_valueController.text != comp.value) {
         _valueController.text = comp.value;
-        if (comp.type == ComponentType.voltageSource || comp.type == ComponentType.currentSource) {
+        if (comp.type == ComponentType.voltageSource ||
+            comp.type == ComponentType.currentSource) {
           _parseSourceValue(comp.value);
         }
       }
@@ -132,22 +133,30 @@ class _PropertiesPanelState extends State<PropertiesPanel> {
 
   void _submitUpdate() {
     if (widget.selectedComponent == null) return;
-    
+
     String newValue = _valueController.text;
-    
-    if (widget.selectedComponent!.type == ComponentType.voltageSource || 
+
+    if (widget.selectedComponent!.type == ComponentType.voltageSource ||
         widget.selectedComponent!.type == ComponentType.currentSource) {
       if (_sourceMode == SourceType.dc) {
-        newValue = _dcValueCtrl.text.isNotEmpty ? 'DC ${_dcValueCtrl.text}' : 'DC 0';
+        newValue = _dcValueCtrl.text.isNotEmpty
+            ? 'DC ${_dcValueCtrl.text}'
+            : 'DC 0';
       } else if (_sourceMode == SourceType.ac) {
-        final phase = _acPhaseCtrl.text.isNotEmpty ? ' ${_acPhaseCtrl.text}' : '';
+        final phase = _acPhaseCtrl.text.isNotEmpty
+            ? ' ${_acPhaseCtrl.text}'
+            : '';
         final mag = _acMagCtrl.text.isNotEmpty ? _acMagCtrl.text : '1';
         newValue = 'DC 0 AC $mag$phase';
       } else if (_sourceMode == SourceType.transient) {
-        final offset = _tranOffsetCtrl.text.isNotEmpty ? _tranOffsetCtrl.text : '0';
+        final offset = _tranOffsetCtrl.text.isNotEmpty
+            ? _tranOffsetCtrl.text
+            : '0';
         final amp = _tranAmpCtrl.text.isNotEmpty ? _tranAmpCtrl.text : '1';
         final freq = _tranFreqCtrl.text.isNotEmpty ? _tranFreqCtrl.text : '1k';
-        final acPart = _acMagCtrl.text.isNotEmpty ? 'AC ${_acMagCtrl.text} ' : '';
+        final acPart = _acMagCtrl.text.isNotEmpty
+            ? 'AC ${_acMagCtrl.text} '
+            : '';
         newValue = 'DC 0 $acPart$_tranType($offset $amp $freq)';
       }
       _valueController.text = newValue;
@@ -183,12 +192,12 @@ class _PropertiesPanelState extends State<PropertiesPanel> {
           children: [
             Row(
               children: [
-                Icon(Icons.memory, size: 16, color: AppColors.primary),
+                Icon(Icons.memory, size: 16, color: AppColors.textPrimary),
                 const SizedBox(width: 8),
                 Text(
                   comp.type.name.toUpperCase(),
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.primary,
+                    color: AppColors.textPrimary,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,
                   ),
@@ -198,10 +207,15 @@ class _PropertiesPanelState extends State<PropertiesPanel> {
             const SizedBox(height: 16),
             _buildTextField('Designator (Label)', _labelController),
             const SizedBox(height: 16),
-            if (comp.type == ComponentType.voltageSource || comp.type == ComponentType.currentSource)
+            if (comp.type == ComponentType.voltageSource ||
+                comp.type == ComponentType.currentSource)
               _buildSourceConfigurator()
             else
-              _buildTextField('Value (e.g. 10k, 5V)', _valueController),
+              _buildTextField(
+                'Value (e.g. 10k, 5V)',
+                _valueController,
+                allowedUnits: const ['', 'p', 'n', 'u', 'm', 'k', 'Meg', 'G'],
+              ),
             const SizedBox(height: 24),
             const Divider(height: 1, color: AppColors.panelBorder),
             const SizedBox(height: 16),
@@ -269,7 +283,9 @@ class _PropertiesPanelState extends State<PropertiesPanel> {
       children: [
         Text(
           'Source Setup',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
         ),
         const SizedBox(height: 8),
         Container(
@@ -288,11 +304,21 @@ class _PropertiesPanelState extends State<PropertiesPanel> {
         ),
         const SizedBox(height: 16),
         if (_sourceMode == SourceType.dc) ...[
-          _buildTextField('DC Value (V/A)', _dcValueCtrl),
+          _buildTextField(
+            'DC Value (V/A)',
+            _dcValueCtrl,
+            allowedUnits: const ['', 'p', 'n', 'u', 'm', 'k', 'Meg', 'G'],
+          ),
         ] else if (_sourceMode == SourceType.ac) ...[
           Row(
             children: [
-              Expanded(child: _buildTextField('Magnitude', _acMagCtrl)),
+              Expanded(
+                child: _buildTextField(
+                  'Magnitude',
+                  _acMagCtrl,
+                  allowedUnits: const ['', 'p', 'n', 'u', 'm', 'k', 'Meg'],
+                ),
+              ),
               const SizedBox(width: 8),
               Expanded(child: _buildTextField('Phase (deg)', _acPhaseCtrl)),
             ],
@@ -302,13 +328,29 @@ class _PropertiesPanelState extends State<PropertiesPanel> {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildTextField('Amplitude', _tranAmpCtrl)),
+              Expanded(
+                child: _buildTextField(
+                  'Amplitude',
+                  _tranAmpCtrl,
+                  allowedUnits: const ['', 'm', 'k'],
+                ),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: _buildTextField('Offset', _tranOffsetCtrl)),
+              Expanded(
+                child: _buildTextField(
+                  'Offset',
+                  _tranOffsetCtrl,
+                  allowedUnits: const ['', 'm', 'k'],
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
-          _buildTextField('Frequency (Hz)', _tranFreqCtrl),
+          _buildTextField(
+            'Frequency (Hz)',
+            _tranFreqCtrl,
+            allowedUnits: const ['', 'Hz', 'kHz', 'MHz', 'GHz'],
+          ),
         ],
       ],
     );
@@ -327,15 +369,20 @@ class _PropertiesPanelState extends State<PropertiesPanel> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
+            color: isSelected
+                ? AppColors.primary.withOpacity(0.1)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(5),
           ),
           alignment: Alignment.center,
           child: Text(
             text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: isSelected ? AppColors.primary : AppColors.textSecondary,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              fontSize: 11,
             ),
           ),
         ),
@@ -349,7 +396,9 @@ class _PropertiesPanelState extends State<PropertiesPanel> {
       children: [
         Text(
           'Waveform Type',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
         ),
         const SizedBox(height: 6),
         Container(
@@ -365,8 +414,13 @@ class _PropertiesPanelState extends State<PropertiesPanel> {
               value: _tranType,
               isExpanded: true,
               dropdownColor: AppColors.panel,
-              icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
+              icon: const Icon(
+                Icons.arrow_drop_down,
+                color: AppColors.textSecondary,
+              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
               onChanged: (val) {
                 if (val != null) {
                   setState(() {
@@ -386,7 +440,20 @@ class _PropertiesPanelState extends State<PropertiesPanel> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller) {
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller, {
+    List<String>? allowedUnits,
+  }) {
+    if (allowedUnits != null) {
+      return UnitInputField(
+        label: label,
+        controller: controller,
+        allowedUnits: allowedUnits,
+        onChanged: (_) => _submitUpdate(),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

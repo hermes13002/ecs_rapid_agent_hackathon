@@ -145,7 +145,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
           _timeSeriesData.clear();
           for (final entry in timeSeries.entries) {
             final list = entry.value as List<dynamic>? ?? [];
-            _timeSeriesData[entry.key] = list.map((e) => (e as num).toDouble()).toList();
+            _timeSeriesData[entry.key] = list
+                .map((e) => (e as num).toDouble())
+                .toList();
           }
         }
 
@@ -360,7 +362,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
       _agentService.simulate(
-        _components, 
+        _components,
         _wires,
         simulationConfig: _simulationConfig,
       );
@@ -567,6 +569,12 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       if ((componentIds.isNotEmpty || wireIds.isNotEmpty) &&
           !_activeTool.startsWith('PLACE_')) {
         _setTool('SELECT');
+      }
+
+      // auto-open properties panel when a single component is clicked
+      if (componentIds.length == 1 && wireIds.isEmpty) {
+        _isLeftPanelOpen = true;
+        _leftPanelTabIndex = 1;
       }
     });
     _focusNode.requestFocus();
@@ -852,12 +860,16 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: _leftPanelTabIndex == 0 ? Colors.white : Colors.transparent,
+                                    color: _leftPanelTabIndex == 0
+                                        ? Colors.white
+                                        : Colors.transparent,
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Icon(
                                     Icons.category_outlined,
-                                    color: _leftPanelTabIndex == 0 ? Colors.black : AppColors.textSecondary,
+                                    color: _leftPanelTabIndex == 0
+                                        ? Colors.black
+                                        : AppColors.textSecondary,
                                   ),
                                 ),
                               ),
@@ -881,12 +893,16 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: _leftPanelTabIndex == 1 ? Colors.white : Colors.transparent,
+                                    color: _leftPanelTabIndex == 1
+                                        ? Colors.white
+                                        : Colors.transparent,
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Icon(
                                     Icons.tune_outlined,
-                                    color: _leftPanelTabIndex == 1 ? Colors.black : AppColors.textSecondary,
+                                    color: _leftPanelTabIndex == 1
+                                        ? Colors.black
+                                        : AppColors.textSecondary,
                                   ),
                                 ),
                               ),
@@ -916,7 +932,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                 child: _leftPanelTabIndex == 0
                                     ? ComponentLibraryPanel(
                                         activeTool: _activeTool,
-                                        onSelectComponent: _selectComponentToPlace,
+                                        onSelectComponent:
+                                            _selectComponentToPlace,
                                       )
                                     : _buildPropertiesPanel(),
                               )
@@ -990,7 +1007,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                       onHorizontalDragUpdate: (details) {
                                         setState(() {
                                           _rightSidebarWidth =
-                                              (_rightSidebarWidth - details.delta.dx)
+                                              (_rightSidebarWidth -
+                                                      details.delta.dx)
                                                   .clamp(200.0, 600.0);
                                         });
                                       },
@@ -999,7 +1017,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                         decoration: const BoxDecoration(
                                           color: Colors.transparent,
                                           border: Border(
-                                            left: BorderSide(color: AppColors.panelBorder, width: 1),
+                                            left: BorderSide(
+                                              color: AppColors.panelBorder,
+                                              width: 1,
+                                            ),
                                           ),
                                         ),
                                         child: Center(
@@ -1007,8 +1028,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                             width: 3,
                                             height: 36,
                                             decoration: BoxDecoration(
-                                              color: AppColors.textSecondary.withValues(alpha: 0.5),
-                                              borderRadius: BorderRadius.circular(1.5),
+                                              color: AppColors.textSecondary
+                                                  .withValues(alpha: 0.5),
+                                              borderRadius:
+                                                  BorderRadius.circular(1.5),
                                             ),
                                           ),
                                         ),
@@ -1039,14 +1062,17 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                                 child: Text(
                                                   _activeSessionTitle,
                                                   maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                   style: Theme.of(context)
                                                       .textTheme
                                                       .labelMedium
                                                       ?.copyWith(
                                                         letterSpacing: 1.0,
-                                                        fontWeight: FontWeight.w600,
-                                                        color: AppColors.textSecondary,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: AppColors
+                                                            .textSecondary,
                                                         fontSize: 11,
                                                       ),
                                                 ),
@@ -1059,13 +1085,22 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                                     setState(() {
                                                       _activeSessionId = null;
                                                       _aiChatHistory.clear();
-                                                      _aiReasoningTokenStream = '';
+                                                      _aiReasoningTokenStream =
+                                                          '';
                                                     });
                                                   },
-                                                  borderRadius: BorderRadius.zero,
+                                                  borderRadius:
+                                                      BorderRadius.zero,
                                                   child: const Padding(
-                                                    padding: EdgeInsets.all(4.0),
-                                                    child: Icon(Icons.add, size: 14, color: AppColors.textSecondary),
+                                                    padding: EdgeInsets.all(
+                                                      4.0,
+                                                    ),
+                                                    child: Icon(
+                                                      Icons.add,
+                                                      size: 14,
+                                                      color: AppColors
+                                                          .textSecondary,
+                                                    ),
                                                   ),
                                                 ),
                                               ),
@@ -1079,116 +1114,258 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                                       builder: (context) {
                                                         String searchQuery = '';
                                                         return StatefulBuilder(
-                                                          builder: (context, setStateDialog) {
-                                                            final filteredSessions = _chatSessions.where((s) {
-                                                              final title = (s['title'] as String? ?? 'Conversation').toLowerCase();
-                                                              return title.contains(searchQuery.toLowerCase());
-                                                            }).toList();
+                                                          builder:
+                                                              (
+                                                                context,
+                                                                setStateDialog,
+                                                              ) {
+                                                                final filteredSessions = _chatSessions.where((
+                                                                  s,
+                                                                ) {
+                                                                  final title =
+                                                                      (s['title']
+                                                                                  as String? ??
+                                                                              'Conversation')
+                                                                          .toLowerCase();
+                                                                  return title
+                                                                      .contains(
+                                                                        searchQuery
+                                                                            .toLowerCase(),
+                                                                      );
+                                                                }).toList();
 
-                                                            return AlertDialog(
-                                                              backgroundColor: AppColors.surface,
-                                                              shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-                                                              title: Text(
-                                                                'Chat History',
-                                                                style: GoogleFonts.inter(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600),
-                                                              ),
-                                                              content: Container(
-                                                                width: 500,
-                                                                constraints: const BoxConstraints(maxHeight: 500),
-                                                                child: Column(
-                                                                  mainAxisSize: MainAxisSize.min,
-                                                                  children: [
-                                                                    TextField(
-                                                                      onChanged: (val) => setStateDialog(() => searchQuery = val),
-                                                                      style: GoogleFonts.inter(color: AppColors.textPrimary, fontSize: 13),
-                                                                      cursorColor: Colors.white,
-                                                                      decoration: InputDecoration(
-                                                                        hintText: 'Search history...',
-                                                                        hintStyle: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13),
-                                                                        prefixIcon: const Icon(Icons.search, size: 16, color: AppColors.textSecondary),
-                                                                        filled: true,
-                                                                        fillColor: AppColors.background,
-                                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                                                        border: const OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide.none),
-                                                                        focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: Colors.white, width: 1)),
+                                                                return AlertDialog(
+                                                                  backgroundColor:
+                                                                      AppColors
+                                                                          .surface,
+                                                                  shape: const RoundedRectangleBorder(
+                                                                    borderRadius:
+                                                                        BorderRadius
+                                                                            .zero,
+                                                                  ),
+                                                                  title: Text(
+                                                                    'Chat History',
+                                                                    style: GoogleFonts.inter(
+                                                                      color: AppColors
+                                                                          .textPrimary,
+                                                                      fontSize:
+                                                                          16,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .w600,
+                                                                    ),
+                                                                  ),
+                                                                  content: Container(
+                                                                    width: 500,
+                                                                    constraints:
+                                                                        const BoxConstraints(
+                                                                          maxHeight:
+                                                                              500,
+                                                                        ),
+                                                                    child: Column(
+                                                                      mainAxisSize:
+                                                                          MainAxisSize
+                                                                              .min,
+                                                                      children: [
+                                                                        TextField(
+                                                                          onChanged: (val) => setStateDialog(
+                                                                            () =>
+                                                                                searchQuery = val,
+                                                                          ),
+                                                                          style: GoogleFonts.inter(
+                                                                            color:
+                                                                                AppColors.textPrimary,
+                                                                            fontSize:
+                                                                                13,
+                                                                          ),
+                                                                          cursorColor:
+                                                                              Colors.white,
+                                                                          decoration: InputDecoration(
+                                                                            hintText:
+                                                                                'Search history...',
+                                                                            hintStyle: GoogleFonts.inter(
+                                                                              color: AppColors.textSecondary,
+                                                                              fontSize: 13,
+                                                                            ),
+                                                                            prefixIcon: const Icon(
+                                                                              Icons.search,
+                                                                              size: 16,
+                                                                              color: AppColors.textSecondary,
+                                                                            ),
+                                                                            filled:
+                                                                                true,
+                                                                            fillColor:
+                                                                                AppColors.background,
+                                                                            contentPadding: const EdgeInsets.symmetric(
+                                                                              horizontal: 12,
+                                                                              vertical: 12,
+                                                                            ),
+                                                                            border: const OutlineInputBorder(
+                                                                              borderRadius: BorderRadius.zero,
+                                                                              borderSide: BorderSide.none,
+                                                                            ),
+                                                                            focusedBorder: const OutlineInputBorder(
+                                                                              borderRadius: BorderRadius.zero,
+                                                                              borderSide: BorderSide(
+                                                                                color: Colors.white,
+                                                                                width: 1,
+                                                                              ),
+                                                                            ),
+                                                                          ),
+                                                                        ),
+                                                                        const SizedBox(
+                                                                          height:
+                                                                              16,
+                                                                        ),
+                                                                        Expanded(
+                                                                          child:
+                                                                              filteredSessions.isEmpty
+                                                                              ? Center(
+                                                                                  child: Text(
+                                                                                    'No matching sessions',
+                                                                                    style: GoogleFonts.inter(
+                                                                                      color: AppColors.textSecondary,
+                                                                                      fontSize: 13,
+                                                                                    ),
+                                                                                  ),
+                                                                                )
+                                                                              : ListView.separated(
+                                                                                  shrinkWrap: true,
+                                                                                  itemCount: filteredSessions.length,
+                                                                                  separatorBuilder:
+                                                                                      (
+                                                                                        context,
+                                                                                        index,
+                                                                                      ) => const Divider(
+                                                                                        height: 1,
+                                                                                        color: AppColors.panelBorder,
+                                                                                      ),
+                                                                                  itemBuilder:
+                                                                                      (
+                                                                                        context,
+                                                                                        index,
+                                                                                      ) {
+                                                                                        final session = filteredSessions[index];
+                                                                                        final isActive =
+                                                                                            session['id'] ==
+                                                                                            _activeSessionId;
+                                                                                        return StatefulBuilder(
+                                                                                          builder:
+                                                                                              (
+                                                                                                context,
+                                                                                                setTileState,
+                                                                                              ) {
+                                                                                                bool isHovered = false;
+                                                                                                final isWhiteBg =
+                                                                                                    isActive ||
+                                                                                                    isHovered;
+                                                                                                return MouseRegion(
+                                                                                                  onEnter:
+                                                                                                      (
+                                                                                                        _,
+                                                                                                      ) => setTileState(
+                                                                                                        () => isHovered = true,
+                                                                                                      ),
+                                                                                                  onExit:
+                                                                                                      (
+                                                                                                        _,
+                                                                                                      ) => setTileState(
+                                                                                                        () => isHovered = false,
+                                                                                                      ),
+                                                                                                  cursor: SystemMouseCursors.click,
+                                                                                                  child: GestureDetector(
+                                                                                                    onTap: () {
+                                                                                                      Navigator.of(
+                                                                                                        context,
+                                                                                                      ).pop();
+                                                                                                      setState(
+                                                                                                        () => _activeSessionId =
+                                                                                                            session['id']
+                                                                                                                as String?,
+                                                                                                      );
+                                                                                                      if (session['id'] !=
+                                                                                                          null) {
+                                                                                                        _loadSessionHistory(
+                                                                                                          session['id']
+                                                                                                              as String,
+                                                                                                        );
+                                                                                                      }
+                                                                                                    },
+                                                                                                    child: Container(
+                                                                                                      padding: const EdgeInsets.symmetric(
+                                                                                                        horizontal: 16,
+                                                                                                        vertical: 12,
+                                                                                                      ),
+                                                                                                      decoration: BoxDecoration(
+                                                                                                        color: isWhiteBg
+                                                                                                            ? Colors.white
+                                                                                                            : Colors.transparent,
+                                                                                                        borderRadius: BorderRadius.zero,
+                                                                                                      ),
+                                                                                                      child: Text(
+                                                                                                        session['title']
+                                                                                                                as String? ??
+                                                                                                            'Conversation',
+                                                                                                        style: GoogleFonts.inter(
+                                                                                                          color: isWhiteBg
+                                                                                                              ? Colors.black
+                                                                                                              : AppColors.textPrimary,
+                                                                                                          fontSize: 13,
+                                                                                                          fontWeight: isActive
+                                                                                                              ? FontWeight.w600
+                                                                                                              : FontWeight.normal,
+                                                                                                        ),
+                                                                                                        maxLines: 1,
+                                                                                                        overflow: TextOverflow.ellipsis,
+                                                                                                      ),
+                                                                                                    ),
+                                                                                                  ),
+                                                                                                );
+                                                                                              },
+                                                                                        );
+                                                                                      },
+                                                                                ),
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                  ),
+                                                                  actions: [
+                                                                    TextButton(
+                                                                      style: TextButton.styleFrom(
+                                                                        shape: const RoundedRectangleBorder(
+                                                                          borderRadius:
+                                                                              BorderRadius.zero,
+                                                                        ),
+                                                                        foregroundColor:
+                                                                            AppColors.textSecondary,
+                                                                      ),
+                                                                      onPressed: () =>
+                                                                          Navigator.of(
+                                                                            context,
+                                                                          ).pop(),
+                                                                      child: const Text(
+                                                                        'Close',
                                                                       ),
                                                                     ),
-                                                                    const SizedBox(height: 16),
-                                                                    Expanded(
-                                                                      child: filteredSessions.isEmpty
-                                                                          ? Center(
-                                                                              child: Text('No matching sessions', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13)),
-                                                                            )
-                                                                          : ListView.separated(
-                                                                              shrinkWrap: true,
-                                                                              itemCount: filteredSessions.length,
-                                                                              separatorBuilder: (context, index) => const Divider(height: 1, color: AppColors.panelBorder),
-                                                                              itemBuilder: (context, index) {
-                                                                                final session = filteredSessions[index];
-                                                                                final isActive = session['id'] == _activeSessionId;
-                                                                                return StatefulBuilder(
-                                                                                  builder: (context, setTileState) {
-                                                                                    bool isHovered = false;
-                                                                                    final isWhiteBg = isActive || isHovered;
-                                                                                    return MouseRegion(
-                                                                                      onEnter: (_) => setTileState(() => isHovered = true),
-                                                                                      onExit: (_) => setTileState(() => isHovered = false),
-                                                                                      cursor: SystemMouseCursors.click,
-                                                                                      child: GestureDetector(
-                                                                                        onTap: () {
-                                                                                          Navigator.of(context).pop();
-                                                                                          setState(() => _activeSessionId = session['id'] as String?);
-                                                                                          if (session['id'] != null) {
-                                                                                            _loadSessionHistory(session['id'] as String);
-                                                                                          }
-                                                                                        },
-                                                                                        child: Container(
-                                                                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                                                                          decoration: BoxDecoration(
-                                                                                            color: isWhiteBg ? Colors.white : Colors.transparent,
-                                                                                            borderRadius: BorderRadius.zero,
-                                                                                          ),
-                                                                                          child: Text(
-                                                                                            session['title'] as String? ?? 'Conversation',
-                                                                                            style: GoogleFonts.inter(
-                                                                                              color: isWhiteBg ? Colors.black : AppColors.textPrimary,
-                                                                                              fontSize: 13,
-                                                                                              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                                                                                            ),
-                                                                                            maxLines: 1,
-                                                                                            overflow: TextOverflow.ellipsis,
-                                                                                          ),
-                                                                                        ),
-                                                                                      ),
-                                                                                    );
-                                                                                  },
-                                                                                );
-                                                                              },
-                                                                            ),
-                                                                    ),
                                                                   ],
-                                                                ),
-                                                              ),
-                                                              actions: [
-                                                                TextButton(
-                                                                  style: TextButton.styleFrom(
-                                                                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-                                                                    foregroundColor: AppColors.textSecondary,
-                                                                  ),
-                                                                  onPressed: () => Navigator.of(context).pop(),
-                                                                  child: const Text('Close'),
-                                                                ),
-                                                              ],
-                                                            );
-                                                          },
+                                                                );
+                                                              },
                                                         );
                                                       },
                                                     );
                                                   },
-                                                  borderRadius: BorderRadius.zero,
+                                                  borderRadius:
+                                                      BorderRadius.zero,
                                                   child: const Padding(
-                                                    padding: EdgeInsets.all(4.0),
-                                                    child: Icon(Icons.history, size: 14, color: AppColors.textSecondary),
+                                                    padding: EdgeInsets.all(
+                                                      4.0,
+                                                    ),
+                                                    child: Icon(
+                                                      Icons.history,
+                                                      size: 14,
+                                                      color: AppColors
+                                                          .textSecondary,
+                                                    ),
                                                   ),
                                                 ),
                                               ),
@@ -1196,14 +1373,20 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                                               Tooltip(
                                                 message: 'Close Panel',
                                                 child: InkWell(
-                                                  onTap: () => setState(() => _isAiExpanded = false),
-                                                  borderRadius: BorderRadius.zero,
+                                                  onTap: () => setState(
+                                                    () => _isAiExpanded = false,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.zero,
                                                   child: const Padding(
-                                                    padding: EdgeInsets.all(4.0),
+                                                    padding: EdgeInsets.all(
+                                                      4.0,
+                                                    ),
                                                     child: Icon(
                                                       Icons.close,
                                                       size: 14,
-                                                      color: AppColors.textSecondary,
+                                                      color: AppColors
+                                                          .textSecondary,
                                                     ),
                                                   ),
                                                 ),
