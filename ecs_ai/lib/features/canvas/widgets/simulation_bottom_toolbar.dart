@@ -31,7 +31,7 @@ class SimulationBottomToolbar extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.panel,
         border: Border(
-          top: BorderSide(color: AppColors.panelBorder.withValues(alpha: 0.3)),
+          top: BorderSide(color: AppColors.panelBorder.withOpacity(0.3)),
         ),
       ),
       child: Row(
@@ -60,7 +60,7 @@ class SimulationBottomToolbar extends StatelessWidget {
                   height: 28,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.15),
+                    color: AppColors.error.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
@@ -87,47 +87,36 @@ class SimulationBottomToolbar extends StatelessWidget {
             ),
             const SizedBox(width: 12),
           ],
-          DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: simulationConfig['type'] as String? ?? 'op',
-              dropdownColor: AppColors.surfaceVariant,
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-              icon: const Icon(Icons.arrow_drop_down, color: Colors.white, size: 16),
-              isDense: true,
-              items: const [
-                DropdownMenuItem(value: 'op', child: Text('OP')),
-                DropdownMenuItem(value: 'tran', child: Text('TRANSIENT')),
-                DropdownMenuItem(value: 'ac', child: Text('AC SWEEP')),
-              ],
-              onChanged: (val) {
-                if (val != null) {
-                  final Map<String, dynamic> newConfig = {'type': val};
-                  if (val == 'tran') {
-                    newConfig['step'] = simulationConfig['step'] ?? '1ms';
-                    newConfig['stop'] = simulationConfig['stop'] ?? '100ms';
-                  } else if (val == 'ac') {
-                    newConfig['points'] = simulationConfig['points'] ?? '10';
-                    newConfig['fstart'] = simulationConfig['fstart'] ?? '1';
-                    newConfig['fstop'] = simulationConfig['fstop'] ?? '100k';
-                  }
-                  onConfigChanged(newConfig);
-                }
+          
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () {
+                _showSimulationSettingsModal(context, simulationConfig, onConfigChanged);
               },
+              child: Tooltip(
+                message: 'Simulation Settings',
+                child: Container(
+                  height: 28,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceVariant,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.tune, color: Colors.white, size: 14),
+                      const SizedBox(width: 6),
+                      Text(
+                        (simulationConfig['type'] as String? ?? 'op').toUpperCase(),
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
-          if (simulationConfig['type'] == 'tran') ...[
-            const SizedBox(width: 8),
-            _SimInputField(label: 'Step', configKey: 'step', config: simulationConfig, onChanged: onConfigChanged),
-            const SizedBox(width: 4),
-            _SimInputField(label: 'Stop', configKey: 'stop', config: simulationConfig, onChanged: onConfigChanged),
-          ] else if (simulationConfig['type'] == 'ac') ...[
-            const SizedBox(width: 8),
-            _SimInputField(label: 'Pts', configKey: 'points', config: simulationConfig, onChanged: onConfigChanged),
-            const SizedBox(width: 4),
-            _SimInputField(label: 'Start', configKey: 'fstart', config: simulationConfig, onChanged: onConfigChanged),
-            const SizedBox(width: 4),
-            _SimInputField(label: 'Stop', configKey: 'fstop', config: simulationConfig, onChanged: onConfigChanged),
-          ],
           const SizedBox(width: 12),
           MouseRegion(
             cursor: SystemMouseCursors.click,
@@ -187,90 +176,298 @@ class SimulationBottomToolbar extends StatelessWidget {
   }
 }
 
-class _SimInputField extends StatefulWidget {
-  final String label;
-  final String configKey;
-  final Map<String, dynamic> config;
-  final ValueChanged<Map<String, dynamic>> onChanged;
+void _showSimulationSettingsModal(
+  BuildContext context,
+  Map<String, dynamic> config,
+  ValueChanged<Map<String, dynamic>> onConfigChanged,
+) {
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Simulation Settings',
+    barrierColor: Colors.black54,
+    transitionDuration: const Duration(milliseconds: 250),
+    pageBuilder: (context, anim1, anim2) {
+      return Align(
+        alignment: Alignment.center,
+        child: Material(
+          color: Colors.transparent,
+          child: _SimulationSettingsModal(
+            initialConfig: config,
+            onConfigChanged: onConfigChanged,
+          ),
+        ),
+      );
+    },
+    transitionBuilder: (context, anim1, anim2, child) {
+      return FadeTransition(
+        opacity: anim1,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.95, end: 1.0).animate(CurvedAnimation(
+            parent: anim1,
+            curve: Curves.easeOutBack,
+          )),
+          child: child,
+        ),
+      );
+    },
+  );
+}
 
-  const _SimInputField({
-    required this.label,
-    required this.configKey,
-    required this.config,
-    required this.onChanged,
+class _SimulationSettingsModal extends StatefulWidget {
+  final Map<String, dynamic> initialConfig;
+  final ValueChanged<Map<String, dynamic>> onConfigChanged;
+
+  const _SimulationSettingsModal({
+    required this.initialConfig,
+    required this.onConfigChanged,
   });
 
   @override
-  State<_SimInputField> createState() => _SimInputFieldState();
+  State<_SimulationSettingsModal> createState() => _SimulationSettingsModalState();
 }
 
-class _SimInputFieldState extends State<_SimInputField> {
-  late TextEditingController _controller;
-  late FocusNode _focusNode;
+class _SimulationSettingsModalState extends State<_SimulationSettingsModal> {
+  late Map<String, dynamic> _config;
+  late TextEditingController _stopCtrl;
+  late TextEditingController _stepCtrl;
+  late TextEditingController _ptsCtrl;
+  late TextEditingController _fstartCtrl;
+  late TextEditingController _fstopCtrl;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.config[widget.configKey]?.toString() ?? '');
-    _focusNode = FocusNode();
-    _focusNode.addListener(() {
-      if (!_focusNode.hasFocus) {
-        _submit();
-      }
-    });
-  }
-
-  @override
-  void didUpdateWidget(covariant _SimInputField oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.config[widget.configKey] != oldWidget.config[oldWidget.configKey]) {
-      final newVal = widget.config[widget.configKey]?.toString() ?? '';
-      if (_controller.text != newVal && !_focusNode.hasFocus) {
-        _controller.text = newVal;
-      }
-    }
-  }
-
-  void _submit() {
-    final newConfig = Map<String, dynamic>.from(widget.config);
-    newConfig[widget.configKey] = _controller.text;
-    widget.onChanged(newConfig);
+    _config = Map<String, dynamic>.from(widget.initialConfig);
+    _stopCtrl = TextEditingController(text: _config['stop']?.toString() ?? '100ms');
+    _stepCtrl = TextEditingController(text: _config['step']?.toString() ?? '1ms');
+    _ptsCtrl = TextEditingController(text: _config['points']?.toString() ?? '10');
+    _fstartCtrl = TextEditingController(text: _config['fstart']?.toString() ?? '1');
+    _fstopCtrl = TextEditingController(text: _config['fstop']?.toString() ?? '100k');
   }
 
   @override
   void dispose() {
-    _controller.dispose();
-    _focusNode.dispose();
+    _stopCtrl.dispose();
+    _stepCtrl.dispose();
+    _ptsCtrl.dispose();
+    _fstartCtrl.dispose();
+    _fstopCtrl.dispose();
     super.dispose();
+  }
+
+  void _apply() {
+    final type = _config['type'];
+    if (type == 'tran') {
+      _config['stop'] = _stopCtrl.text;
+      _config['step'] = _stepCtrl.text;
+    } else if (type == 'ac') {
+      _config['points'] = _ptsCtrl.text;
+      _config['fstart'] = _fstartCtrl.text;
+      _config['fstop'] = _fstopCtrl.text;
+    }
+    widget.onConfigChanged(_config);
+    Navigator.of(context).pop();
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 55,
-      height: 28,
-      margin: const EdgeInsets.only(right: 4),
-      child: TextField(
-        controller: _controller,
-        focusNode: _focusNode,
-        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
-        decoration: InputDecoration(
-          labelText: widget.label,
-          labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 10),
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-          enabledBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: AppColors.panelBorder),
-            borderRadius: BorderRadius.circular(4),
+      width: 340,
+      decoration: BoxDecoration(
+        color: AppColors.panel,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.panelBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
-          focusedBorder: OutlineInputBorder(
-            borderSide: const BorderSide(color: Colors.white, width: 1.5),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          floatingLabelBehavior: FloatingLabelBehavior.always,
-        ),
-        onSubmitted: (_) => _submit(),
+        ],
       ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+            child: Row(
+              children: [
+                const Icon(Icons.tune, color: AppColors.primary, size: 20),
+                const SizedBox(width: 10),
+                Text(
+                  'Simulation Settings',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close, color: AppColors.textSecondary, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.panelBorder),
+          // Body
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: _buildConfigForm(),
+          ),
+          // Footer
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
+                  onPressed: _apply,
+                  child: const Text('Apply Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConfigForm() {
+    final type = _config['type'] as String? ?? 'op';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildDropdown(
+          label: 'Analysis Type',
+          value: type,
+          items: const [
+            DropdownMenuItem(value: 'op', child: Text('Operating Point (DC)')),
+            DropdownMenuItem(value: 'tran', child: Text('Transient (Time Domain)')),
+            DropdownMenuItem(value: 'ac', child: Text('AC Sweep (Frequency)')),
+          ],
+          onChanged: (val) {
+            if (val != null) {
+              setState(() {
+                _config['type'] = val;
+                if (val == 'tran') {
+                  _config['step'] ??= '1ms';
+                  _config['stop'] ??= '100ms';
+                } else if (val == 'ac') {
+                  _config['points'] ??= '10';
+                  _config['fstart'] ??= '1';
+                  _config['fstop'] ??= '100k';
+                }
+              });
+            }
+          },
+        ),
+        const SizedBox(height: 20),
+        if (type == 'tran') ...[
+          Text('Transient Settings', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.primary)),
+          const SizedBox(height: 12),
+          _buildInputRow('Stop Time', _stopCtrl, 'e.g. 100ms'),
+          const SizedBox(height: 12),
+          _buildInputRow('Time Step', _stepCtrl, 'e.g. 1ms'),
+        ] else if (type == 'ac') ...[
+          Text('AC Sweep Settings', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.primary)),
+          const SizedBox(height: 12),
+          _buildInputRow('Points/Decade', _ptsCtrl, 'e.g. 10'),
+          const SizedBox(height: 12),
+          _buildInputRow('Start Freq', _fstartCtrl, 'e.g. 1'),
+          const SizedBox(height: 12),
+          _buildInputRow('Stop Freq', _fstopCtrl, 'e.g. 100k'),
+        ] else ...[
+          const Text('No additional settings required for OP.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        ]
+      ],
+    );
+  }
+
+  Widget _buildDropdown({
+    required String label,
+    required String value,
+    required List<DropdownMenuItem<String>> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
+        const SizedBox(height: 6),
+        Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppColors.panelBorder),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              dropdownColor: AppColors.panel,
+              icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white),
+              onChanged: onChanged,
+              items: items,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInputRow(String label, TextEditingController controller, String hint) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: Text(label, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white)),
+        ),
+        Expanded(
+          flex: 3,
+          child: SizedBox(
+            height: 36,
+            child: TextField(
+              controller: controller,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                filled: true,
+                fillColor: AppColors.surface,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.panelBorder)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.panelBorder)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.primary)),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

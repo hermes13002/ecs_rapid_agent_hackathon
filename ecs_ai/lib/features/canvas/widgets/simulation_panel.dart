@@ -5,7 +5,7 @@ import 'package:ecs_ai/core/models/circuit_component.dart';
 import 'package:collection/collection.dart';
 import 'package:fl_chart/fl_chart.dart';
 
-class SimulationPanel extends StatelessWidget {
+class SimulationPanel extends StatefulWidget {
   final int simulationTabIndex;
   final Map<String, Map<String, dynamic>> componentMetrics;
   final List<CircuitComponent> components;
@@ -25,10 +25,17 @@ class SimulationPanel extends StatelessWidget {
     required this.onHoverComponent,
   });
 
+  @override
+  State<SimulationPanel> createState() => _SimulationPanelState();
+}
+
+class _SimulationPanelState extends State<SimulationPanel> {
+  final Set<String> _hiddenTraces = {};
+
   Widget _buildSimTabButton(String label, int index) {
-    final isSelected = simulationTabIndex == index;
+    final isSelected = widget.simulationTabIndex == index;
     return GestureDetector(
-      onTap: () => onTabChanged(index),
+      onTap: () => widget.onTabChanged(index),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         alignment: Alignment.center,
@@ -48,37 +55,55 @@ class SimulationPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildLegendItem(String label, Color color) {
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.textPrimary,
+  Widget _buildInteractiveLegendItem(String label, Color color, bool isVisible) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: isVisible ? color : AppColors.panelBorder,
+              shape: BoxShape.circle,
             ),
           ),
-        ),
-      ],
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: isVisible ? AppColors.textPrimary : AppColors.textSecondary.withOpacity(0.5),
+                fontWeight: isVisible ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: Icon(isVisible ? Icons.visibility : Icons.visibility_off, size: 14),
+            color: isVisible ? AppColors.primary : AppColors.textSecondary.withOpacity(0.5),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: () {
+              setState(() {
+                if (isVisible) {
+                  _hiddenTraces.add(label);
+                } else {
+                  _hiddenTraces.remove(label);
+                }
+              });
+            },
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildWaveformTab() {
-    final hasTime = timeSeriesData != null && timeSeriesData!.containsKey('time');
-    final hasFreq = timeSeriesData != null && timeSeriesData!.containsKey('frequency');
-    final hasData = timeSeriesData != null && timeSeriesData!.isNotEmpty && (hasTime || hasFreq);
+    final hasTime = widget.timeSeriesData != null && widget.timeSeriesData!.containsKey('time');
+    final hasFreq = widget.timeSeriesData != null && widget.timeSeriesData!.containsKey('frequency');
+    final hasData = widget.timeSeriesData != null && widget.timeSeriesData!.isNotEmpty && (hasTime || hasFreq);
     
-    // We will define a list of vibrant colors for the waveforms
     final waveformColors = [
       Colors.cyan,
       Colors.amber,
@@ -94,51 +119,48 @@ class SimulationPanel extends StatelessWidget {
 
     if (hasData) {
       final xKey = hasTime ? 'time' : 'frequency';
-      final xArray = timeSeriesData![xKey]!;
+      final xArray = widget.timeSeriesData![xKey]!;
       if (xArray.isNotEmpty) {
         minX = xArray.first;
         maxX = xArray.last;
       }
 
       int colorIndex = 0;
-      for (final entry in timeSeriesData!.entries) {
+      for (final entry in widget.timeSeriesData!.entries) {
         if (entry.key == 'time' || entry.key == 'frequency') continue;
 
-        final yValues = entry.value;
-        List<FlSpot> spots = [];
-        
-        for (int i = 0; i < xArray.length && i < yValues.length; i++) {
-          spots.add(FlSpot(xArray[i], yValues[i]));
-          if (yValues[i] < minY) minY = yValues[i];
-          if (yValues[i] > maxY) maxY = yValues[i];
-        }
-
+        final isVisible = !_hiddenTraces.contains(entry.key);
         final color = waveformColors[colorIndex % waveformColors.length];
         
-        lineBars.add(
-          LineChartBarData(
-            spots: spots,
-            isCurved: false,
-            color: color,
-            barWidth: 1.5,
-            isStrokeCapRound: true,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(show: false),
-          ),
-        );
+        legendItems.add(_buildInteractiveLegendItem(entry.key, color, isVisible));
 
-        legendItems.add(
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _buildLegendItem(entry.key, color),
-          )
-        );
+        if (isVisible) {
+          final yValues = entry.value;
+          List<FlSpot> spots = [];
+          
+          for (int i = 0; i < xArray.length && i < yValues.length; i++) {
+            spots.add(FlSpot(xArray[i], yValues[i]));
+            if (yValues[i] < minY) minY = yValues[i];
+            if (yValues[i] > maxY) maxY = yValues[i];
+          }
+          
+          lineBars.add(
+            LineChartBarData(
+              spots: spots,
+              isCurved: false,
+              color: color,
+              barWidth: 1.5,
+              isStrokeCapRound: true,
+              dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(show: false),
+            ),
+          );
+        }
 
         colorIndex++;
       }
     }
 
-    // Add a bit of padding to Y axis
     if (minY == double.infinity) minY = -1;
     if (maxY == double.negativeInfinity) maxY = 1;
     final yRange = maxY - minY;
@@ -166,11 +188,11 @@ class SimulationPanel extends StatelessWidget {
                         drawVerticalLine: true,
                         horizontalInterval: yRange > 0 ? (yRange / 5).clamp(0.01, double.infinity) : 1,
                         getDrawingHorizontalLine: (value) => FlLine(
-                          color: AppColors.panelBorder.withValues(alpha: 0.5),
+                          color: AppColors.panelBorder.withOpacity(0.5),
                           strokeWidth: 1,
                         ),
                         getDrawingVerticalLine: (value) => FlLine(
-                          color: AppColors.panelBorder.withValues(alpha: 0.5),
+                          color: AppColors.panelBorder.withOpacity(0.5),
                           strokeWidth: 1,
                         ),
                       ),
@@ -227,7 +249,11 @@ class SimulationPanel extends StatelessWidget {
                                   : '${(spot.x * 1000).toStringAsFixed(2)}ms';
                               return LineTooltipItem(
                                 '${spot.y.toStringAsFixed(3)}V\n@ $xLabel',
-                                const TextStyle(color: Colors.white, fontSize: 12),
+                                TextStyle(
+                                  color: lineBars[spot.barIndex].color, 
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               );
                             }).toList();
                           },
@@ -245,7 +271,7 @@ class SimulationPanel extends StatelessWidget {
               ),
             ),
             Container(
-              width: 150,
+              width: 160,
               decoration: const BoxDecoration(
                 border: Border(
                   left: BorderSide(color: AppColors.panelBorder),
@@ -255,9 +281,9 @@ class SimulationPanel extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('NETS', style: TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                  const Text('SIGNALS', style: TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
                   const SizedBox(height: 16),
-                  if (legendItems.isNotEmpty) ...legendItems else const Text('No Nets', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                  if (legendItems.isNotEmpty) ...legendItems else const Text('No Signals', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
                 ],
               ),
             ),
@@ -268,7 +294,7 @@ class SimulationPanel extends StatelessWidget {
   }
 
   Widget _buildComponentValuesTab() {
-    if (componentMetrics.isEmpty) {
+    if (widget.componentMetrics.isEmpty) {
       return const Center(
         child: Text(
           'Run simulation to view component metrics.',
@@ -285,7 +311,7 @@ class SimulationPanel extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.panelBorder.withValues(alpha: 0.3))),
+              border: Border(bottom: BorderSide(color: AppColors.panelBorder.withOpacity(0.3))),
             ),
             child: Row(
               children: [
@@ -300,10 +326,10 @@ class SimulationPanel extends StatelessWidget {
           Expanded(
             child: SingleChildScrollView(
               child: Column(
-                children: componentMetrics.entries.map((e) {
+                children: widget.componentMetrics.entries.map((e) {
                   final compId = e.key;
                   final metrics = e.value;
-                  final comp = components.firstWhereOrNull((c) => c.id == compId);
+                  final comp = widget.components.firstWhereOrNull((c) => c.id == compId);
                   
                   if (comp == null) return const SizedBox.shrink();
 
@@ -314,17 +340,17 @@ class SimulationPanel extends StatelessWidget {
                   double currentMa = current * 1000;
                   double powerMw = power * 1000;
 
-                  final cellStyle = TextStyle(fontFamily: 'JetBrains Mono', fontSize: 13, color: AppColors.textSecondary.withValues(alpha: 0.9));
-                  final isHovered = hoveredComponentId == compId;
+                  final cellStyle = TextStyle(fontFamily: 'JetBrains Mono', fontSize: 13, color: AppColors.textSecondary.withOpacity(0.9));
+                  final isHovered = widget.hoveredComponentId == compId;
 
                   return MouseRegion(
-                    onEnter: (_) => onHoverComponent(compId),
-                    onExit: (_) => onHoverComponent(null),
+                    onEnter: (_) => widget.onHoverComponent(compId),
+                    onExit: (_) => widget.onHoverComponent(null),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                       decoration: BoxDecoration(
-                        color: isHovered ? AppColors.selection.withValues(alpha: 0.15) : Colors.transparent,
-                        border: Border(bottom: BorderSide(color: AppColors.panelBorder.withValues(alpha: 0.1))),
+                        color: isHovered ? AppColors.selection.withOpacity(0.15) : Colors.transparent,
+                        border: Border(bottom: BorderSide(color: AppColors.panelBorder.withOpacity(0.1))),
                       ),
                       child: Row(
                         children: [
@@ -390,7 +416,7 @@ class SimulationPanel extends StatelessWidget {
           ),
           const Divider(height: 1),
           Expanded(
-            child: simulationTabIndex == 0 
+            child: widget.simulationTabIndex == 0 
                 ? _buildWaveformTab() 
                 : _buildComponentValuesTab(),
           ),
