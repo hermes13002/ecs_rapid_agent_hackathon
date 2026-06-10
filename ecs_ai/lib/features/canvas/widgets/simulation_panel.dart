@@ -74,7 +74,9 @@ class SimulationPanel extends StatelessWidget {
   }
 
   Widget _buildWaveformTab() {
-    final hasData = timeSeriesData != null && timeSeriesData!.isNotEmpty && timeSeriesData!.containsKey('time');
+    final hasTime = timeSeriesData != null && timeSeriesData!.containsKey('time');
+    final hasFreq = timeSeriesData != null && timeSeriesData!.containsKey('frequency');
+    final hasData = timeSeriesData != null && timeSeriesData!.isNotEmpty && (hasTime || hasFreq);
     
     // We will define a list of vibrant colors for the waveforms
     final waveformColors = [
@@ -91,23 +93,24 @@ class SimulationPanel extends StatelessWidget {
     double minX = 0, maxX = 0, minY = double.infinity, maxY = double.negativeInfinity;
 
     if (hasData) {
-      final timeArray = timeSeriesData!['time']!;
-      if (timeArray.isNotEmpty) {
-        minX = timeArray.first;
-        maxX = timeArray.last;
+      final xKey = hasTime ? 'time' : 'frequency';
+      final xArray = timeSeriesData![xKey]!;
+      if (xArray.isNotEmpty) {
+        minX = xArray.first;
+        maxX = xArray.last;
       }
 
       int colorIndex = 0;
       for (final entry in timeSeriesData!.entries) {
-        if (entry.key == 'time') continue;
+        if (entry.key == 'time' || entry.key == 'frequency') continue;
 
-        final voltages = entry.value;
+        final yValues = entry.value;
         List<FlSpot> spots = [];
         
-        for (int i = 0; i < timeArray.length && i < voltages.length; i++) {
-          spots.add(FlSpot(timeArray[i], voltages[i]));
-          if (voltages[i] < minY) minY = voltages[i];
-          if (voltages[i] > maxY) maxY = voltages[i];
+        for (int i = 0; i < xArray.length && i < yValues.length; i++) {
+          spots.add(FlSpot(xArray[i], yValues[i]));
+          if (yValues[i] < minY) minY = yValues[i];
+          if (yValues[i] > maxY) maxY = yValues[i];
         }
 
         final color = waveformColors[colorIndex % waveformColors.length];
@@ -181,10 +184,14 @@ class SimulationPanel extends StatelessWidget {
                             reservedSize: 30,
                             interval: (maxX - minX) > 0 ? ((maxX - minX) / 5) : 1,
                             getTitlesWidget: (value, meta) {
+                              final isFreq = hasFreq;
+                              final label = isFreq 
+                                  ? (value >= 1000 ? '${(value / 1000).toStringAsFixed(1)}kHz' : '${value.toStringAsFixed(0)}Hz')
+                                  : '${(value * 1000).toStringAsFixed(1)}ms';
                               return SideTitleWidget(
                                 meta: meta,
                                 child: Text(
-                                  '${(value * 1000).toStringAsFixed(1)}ms',
+                                  label,
                                   style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
                                 ),
                               );
@@ -214,8 +221,12 @@ class SimulationPanel extends StatelessWidget {
                         touchTooltipData: LineTouchTooltipData(
                           getTooltipItems: (touchedSpots) {
                             return touchedSpots.map((spot) {
+                              final isFreq = hasFreq;
+                              final xLabel = isFreq 
+                                  ? (spot.x >= 1000 ? '${(spot.x / 1000).toStringAsFixed(1)}kHz' : '${spot.x.toStringAsFixed(0)}Hz')
+                                  : '${(spot.x * 1000).toStringAsFixed(2)}ms';
                               return LineTooltipItem(
-                                '${spot.y.toStringAsFixed(3)}V\n@ ${(spot.x * 1000).toStringAsFixed(2)}ms',
+                                '${spot.y.toStringAsFixed(3)}V\n@ $xLabel',
                                 const TextStyle(color: Colors.white, fontSize: 12),
                               );
                             }).toList();

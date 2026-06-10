@@ -70,12 +70,21 @@ class ChatMessage(BaseModel):
     timestamp: Optional[str] = None
 
 
+class SimulationConfig(BaseModel):
+    type: str = Field(default="op", description="Simulation type: op, tran, ac")
+    step: Optional[str] = None
+    stop: Optional[str] = None
+    points: Optional[int] = None
+    fstart: Optional[str] = None
+    fstop: Optional[str] = None
+
 class CircuitSchematic(BaseModel):
     """top-level data contract between dart frontend and python backend"""
     components: List[CircuitComponent]
     wires: List[CircuitWire]
     nets: List[LogicalNet]
     chatHistory: List[ChatMessage] = Field(default_factory=list)
+    simulation_config: Optional[SimulationConfig] = None
 
 class PatchOperation(BaseModel):
     op: str = Field(description="Operation type: 'add', 'update', 'remove'")

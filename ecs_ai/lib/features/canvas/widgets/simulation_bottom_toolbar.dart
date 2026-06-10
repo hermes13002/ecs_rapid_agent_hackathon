@@ -101,20 +101,33 @@ class SimulationBottomToolbar extends StatelessWidget {
               ],
               onChanged: (val) {
                 if (val != null) {
-                  final newConfig = {'type': val};
+                  final Map<String, dynamic> newConfig = {'type': val};
                   if (val == 'tran') {
-                    newConfig['step'] = '1ms';
-                    newConfig['stop'] = '100ms';
+                    newConfig['step'] = simulationConfig['step'] ?? '1ms';
+                    newConfig['stop'] = simulationConfig['stop'] ?? '100ms';
                   } else if (val == 'ac') {
-                    newConfig['dec'] = '10';
-                    newConfig['start'] = '1';
-                    newConfig['stop'] = '100k';
+                    newConfig['points'] = simulationConfig['points'] ?? '10';
+                    newConfig['fstart'] = simulationConfig['fstart'] ?? '1';
+                    newConfig['fstop'] = simulationConfig['fstop'] ?? '100k';
                   }
                   onConfigChanged(newConfig);
                 }
               },
             ),
           ),
+          if (simulationConfig['type'] == 'tran') ...[
+            const SizedBox(width: 8),
+            _SimInputField(label: 'Step', configKey: 'step', config: simulationConfig, onChanged: onConfigChanged),
+            const SizedBox(width: 4),
+            _SimInputField(label: 'Stop', configKey: 'stop', config: simulationConfig, onChanged: onConfigChanged),
+          ] else if (simulationConfig['type'] == 'ac') ...[
+            const SizedBox(width: 8),
+            _SimInputField(label: 'Pts', configKey: 'points', config: simulationConfig, onChanged: onConfigChanged),
+            const SizedBox(width: 4),
+            _SimInputField(label: 'Start', configKey: 'fstart', config: simulationConfig, onChanged: onConfigChanged),
+            const SizedBox(width: 4),
+            _SimInputField(label: 'Stop', configKey: 'fstop', config: simulationConfig, onChanged: onConfigChanged),
+          ],
           const SizedBox(width: 12),
           MouseRegion(
             cursor: SystemMouseCursors.click,
@@ -169,6 +182,94 @@ class SimulationBottomToolbar extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SimInputField extends StatefulWidget {
+  final String label;
+  final String configKey;
+  final Map<String, dynamic> config;
+  final ValueChanged<Map<String, dynamic>> onChanged;
+
+  const _SimInputField({
+    required this.label,
+    required this.configKey,
+    required this.config,
+    required this.onChanged,
+  });
+
+  @override
+  State<_SimInputField> createState() => _SimInputFieldState();
+}
+
+class _SimInputFieldState extends State<_SimInputField> {
+  late TextEditingController _controller;
+  late FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.config[widget.configKey]?.toString() ?? '');
+    _focusNode = FocusNode();
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus) {
+        _submit();
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _SimInputField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.config[widget.configKey] != oldWidget.config[oldWidget.configKey]) {
+      final newVal = widget.config[widget.configKey]?.toString() ?? '';
+      if (_controller.text != newVal && !_focusNode.hasFocus) {
+        _controller.text = newVal;
+      }
+    }
+  }
+
+  void _submit() {
+    final newConfig = Map<String, dynamic>.from(widget.config);
+    newConfig[widget.configKey] = _controller.text;
+    widget.onChanged(newConfig);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 55,
+      height: 28,
+      margin: const EdgeInsets.only(right: 4),
+      child: TextField(
+        controller: _controller,
+        focusNode: _focusNode,
+        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+        decoration: InputDecoration(
+          labelText: widget.label,
+          labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 10),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+          enabledBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: AppColors.panelBorder),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderSide: const BorderSide(color: Colors.white, width: 1.5),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          floatingLabelBehavior: FloatingLabelBehavior.always,
+        ),
+        onSubmitted: (_) => _submit(),
       ),
     );
   }

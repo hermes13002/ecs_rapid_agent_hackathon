@@ -193,14 +193,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
 
     _agentService.errors.listen((error) {
       if (!mounted) return;
-      if (error.toLowerCase().contains('connection') ||
-          error.toLowerCase().contains('websocket')) {
-        _showNotification(error);
-      } else {
-        setState(() {
-          _simulationStatus = 'Error: $error';
-        });
-      }
+      _showNotification(error);
+      setState(() {
+        _simulationStatus = 'Error: $error';
+      });
     });
 
     _ideAgentService.agentReasoning.listen((token) {

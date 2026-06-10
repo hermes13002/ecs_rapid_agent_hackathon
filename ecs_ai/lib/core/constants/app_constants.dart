@@ -31,10 +31,12 @@ abstract final class AppConstants {
 /// global configuration for api connections
 abstract final class ApiConstants {
   // IMPORTANT: For local development, use localhost.
+  static const String baseUrl = 'http://127.0.0.1:8000';
+  static const String wsUrl = 'ws://127.0.0.1:8000';
 
   // static const String baseUrl = 'https://ecs-rapid-agent-hackathon-609652852189.africa-south1.run.app';
   // static const String wsUrl = 'wss://ecs-rapid-agent-hackathon-609652852189.africa-south1.run.app';
 
-  static const String baseUrl = 'https://ecs-ai-9ywk.onrender.com';
-  static const String wsUrl = 'wss://ecs-ai-9ywk.onrender.com';
+  // static const String baseUrl = 'https://ecs-ai-9ywk.onrender.com';
+  // static const String wsUrl = 'wss://ecs-ai-9ywk.onrender.com';
 }

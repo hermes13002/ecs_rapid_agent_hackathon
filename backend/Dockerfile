@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 RUN apt-get update && \
-    apt-get install -y libngspice0-dev && \
+    apt-get install -y ngspice libngspice0-dev && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

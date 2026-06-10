@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 def _parse_value(raw: str) -> str:
     """normalizes component values to spice-compatible format"""
     val = raw.strip().lower()
+    
+    # skip parsing for complex spice commands like sine(), pulse(), or multi-part strings
+    if " " in val or "(" in val or "sine" in val or "pulse" in val or "dc " in val or "ac " in val:
+        return raw.strip()
+
     # handle common suffixes
     replacements = {
         "meg": "Meg", "μ": "u", "µ": "u",
@@ -102,12 +107,20 @@ def generate_netlist(schematic: CircuitSchematic) -> str:
             # p1 = positive, p2 = negative
             np = _get_node(net_map, cid, "p1")
             nn = _get_node(net_map, cid, "p2")
-            lines.append(f"{label} {np} {nn} DC {val}")
+            # bypass auto-adding dc for advanced inputs
+            if any(x in val.upper() for x in ("DC", "AC", "SINE", "PULSE")):
+                lines.append(f"{label} {np} {nn} {val}")
+            else:
+                lines.append(f"{label} {np} {nn} DC {val}")
 
         elif comp.type == ComponentType.CURRENT_SOURCE:
             np = _get_node(net_map, cid, "p1")
             nn = _get_node(net_map, cid, "p2")
-            lines.append(f"{label} {np} {nn} DC {val}")
+            # bypass auto-adding dc for inputs for transient and AC Sweep
+            if any(x in val.upper() for x in ("DC", "AC", "SINE", "PULSE")):
+                lines.append(f"{label} {np} {nn} {val}")
+            else:
+                lines.append(f"{label} {np} {nn} DC {val}")
 
         elif comp.type in (
             ComponentType.TRANSISTOR_NPN,
@@ -143,7 +156,23 @@ def generate_netlist(schematic: CircuitSchematic) -> str:
     lines.append(".model DLED D(Is=1e-20 N=1.6 Rs=4)")
     lines.append(".model Q2N2222 NPN(Is=14.34f Bf=255.9)")
     lines.append(".model Q2N2907 PNP(Is=650.6E-18 Bf=231.7)")
-    lines.append(".tran ")
+
+    sim_config = getattr(schematic, "simulation_config", None)
+    if sim_config:
+        if sim_config.type == "tran":
+            step = sim_config.step or "1ms"
+            stop = sim_config.stop or "10ms"
+            lines.append(f".tran {step} {stop}")
+        elif sim_config.type == "ac":
+            pts = sim_config.points or 10
+            fstart = sim_config.fstart or "1"
+            fstop = sim_config.fstop or "10k"
+            lines.append(f".ac dec {pts} {fstart} {fstop}")
+        else:
+            lines.append(".op")
+    else:
+        lines.append(".op")
+    
     lines.append("")
 
     return "\n".join(lines)
@@ -185,43 +214,99 @@ def generate_netlist(schematic: CircuitSchematic) -> str:
 import tempfile
 from pathlib import Path
 
+import os
+import sys
 
-# Assuming your other imports (SimRunner, RawRead, etc.) are at the top
 
-def run_simulation(schematic: CircuitSchematic) -> str:
-    #convert netlist to string
-    netlist_str = generate_netlist(schematic).strip()
+def run_simulation(schematic: CircuitSchematic) -> Tuple[bool, Dict, str]:
+    try:
+        # convert netlist to string
+        netlist_str = generate_netlist(schematic).strip()
 
-    #create temporary directory with temp
-    with tempfile.TemporaryDirectory() as temp_dir:
-        temp_path = Path(temp_dir)
+        # create temporary directory with temp
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
 
-        #write netlist to file in temp directory
-        netlist_file = temp_path / "circuit.cir"
-        netlist_file.write_text(netlist_str, encoding="utf-8")
+            # write netlist to file in temp directory
+            netlist_file = temp_path / "circuit.cir"
+            netlist_file.write_text(netlist_str, encoding="utf-8")
 
-        #point simulation engine to temp folder
-        runner = SimRunner(simulator=NGspiceSimulator, output_folder=str(temp_path))
-        run_file_path = temp_path / netlist_file.name
+            # point simulation engine to temp folder
+            if sys.platform == "win32" and os.path.exists(r"C:\Spice64\bin\ngspice_con.exe"):
+                # using explicit path to bypass Windows PATH environment variable cache
+                CustomNGSpice = NGspiceSimulator.create_from(r"C:/Spice64/bin/ngspice_con.exe")
+                runner = SimRunner(simulator=CustomNGSpice, output_folder=str(temp_path))
+            else:
+                runner = SimRunner(simulator=NGspiceSimulator, output_folder=str(temp_path))
 
-        #log outputs
-        raw_file, log_file = runner.run_now(str(netlist_file), run_filename=str(run_file_path))
+            # log outputs
+            raw_file, log_file = runner.run_now(str(netlist_file), run_filename="run.cir")
 
-        #Pass .raw output file to parser
-        out = RawRead(raw_file)
+            if not raw_file or not os.path.exists(raw_file):
+                error_msg = "Simulation failed: NGSPICE executable not found or failed to run."
+                if log_file and os.path.exists(log_file):
+                    log_content = Path(log_file).read_text(encoding="utf-8", errors="ignore").strip()
+                    if log_content:
+                        error_msg = f"Simulation aborted. SPICE Log:\n{log_content}"
+                logger.error(error_msg)
+                return False, {"netlist": netlist_str}, error_msg
+            
+            # passing .raw output file to parser
+            out = RawRead(raw_file)
 
-        #convert to CSV
-        csv_out = temp_path / "output.csv"
-        out.to_csv(csv_out)
+            # convert to CSV
+            csv_out = temp_path / "output.csv"
+            out.to_csv(csv_out)
 
-        #read CSV file and convert it to JSON
-        with open(csv_out, mode='r', encoding='utf-8') as f:
-            csv_read = csv.DictReader(f)
-            data_list = list(csv_read)
+            # read CSV file
+            with open(csv_out, mode='r', encoding='utf-8') as f:
+                csv_read = list(csv.DictReader(f))
 
-            json_output = json.dumps(data_list)
+            sim_type = getattr(schematic.simulation_config, "type", "op") if schematic.simulation_config else "op"
+            def clean_spice_key(key: str) -> str:
+                k = key.strip().lower()
+                # voltage e.g v(net_1) will be net_1
+                if k.startswith("v(") and k.endswith(")"):
+                    return k[2:-1]
+                # current e.g. i(v6) will be I(V6)
+                if k.startswith("i(") and k.endswith(")"):
+                    comp = k[2:-1].upper()
+                    return f"I({comp})"
+                # branch current e.g. v6#branch will be I(V6)
+                if "#branch" in k:
+                    comp = k.split("#")[0].upper()
+                    return f"I({comp})"
+                return k
 
-    return json_output
+            data = {"netlist": netlist_str}
+            if csv_read:
+                row = csv_read[0]
+                node_voltages = {}
+                for k, v in row.items():
+                    clean_key = clean_spice_key(k)
+                    try:
+                        node_voltages[clean_key] = abs(complex(v))
+                    except ValueError:
+                        pass
+                data["node_voltages"] = node_voltages
+
+            if sim_type != "op":
+                time_series = {}
+                for row in csv_read:
+                    for k, v in row.items():
+                        clean_key = clean_spice_key(k)
+                        if clean_key not in time_series:
+                            time_series[clean_key] = []
+                        try:
+                            time_series[clean_key].append(abs(complex(v)))
+                        except ValueError:
+                            time_series[clean_key].append(0.0)
+                data["time_series"] = time_series
+
+        return True, data, ""
+    except Exception as e:
+        logger.exception("Simulation failed")
+        return False, {"failure_type": "exception", "netlist": locals().get("netlist_str", "")}, str(e)
 
 
 def validate_topology(schematic: CircuitSchematic) -> list[dict]:

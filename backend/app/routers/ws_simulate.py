@@ -121,7 +121,7 @@ async def ws_simulate(websocket: WebSocket, token: str = Query(None)):
                             v1 = node_voltages.get(_get_node(net_map, comp.id, "p1"), 0.0)
                             v2 = node_voltages.get(_get_node(net_map, comp.id, "p2"), 0.0)
                             dv = abs(v1 - v2)
-                            branch_key = f"v{comp.label.lower()}#branch"
+                            branch_key = f"I({comp.label.upper()})"
                             # SPICE convention: positive current enters p1 (positive terminal) and leaves p2
                             i_signed = node_voltages.get(branch_key, 0.0)
                             i = abs(i_signed)
@@ -151,14 +151,18 @@ async def ws_simulate(websocket: WebSocket, token: str = Query(None)):
                             },
                         })
 
+                    result_payload = {
+                        "nets": enriched_nets,
+                        "components": component_metrics,
+                        "netlist": data.get("netlist", ""),
+                    }
+                    if "time_series" in data:
+                        result_payload["time_series"] = data["time_series"]
+
                     await websocket.send_json({
                         "status": "success",
                         "action": "simulate",
-                        "result": {
-                            "nets": enriched_nets,
-                            "components": component_metrics,
-                            "netlist": data.get("netlist", ""),
-                        },
+                        "result": result_payload,
                     })
                     await auto_save_project(user_id, schematic.model_dump(), "simulate")
                 else:
