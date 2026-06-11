@@ -18,4 +18,4 @@ EXPOSE 8080
 # The default command runs the FastAPI backend.
 # To run the MCP server instead, override the container startup command in Cloud Run to:
 # fastmcp run app/google_agent/mcp_server.py --transport sse --host 0.0.0.0 --port 8080
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}
