@@ -81,10 +81,9 @@ async def ws_ide_chat(websocket: WebSocket, token: str = Query(None)):
                 
                 full_response = ""
                 try:
-                    # 1. Compress the state for the ADK agent
                     from app.schemas.circuit import CircuitSchematic
                     from app.google_agent.state_injection import summarize_circuit_state
-                    from app.google_agent.agent import execute_agent_turn
+                    from app.routers.chat import call_vertex_agent
                     
                     if canvas_context:
                         try:
@@ -96,17 +95,13 @@ async def ws_ide_chat(websocket: WebSocket, token: str = Query(None)):
                     else:
                         state_summary = "The canvas is currently empty."
                         
-                    # 2. Execute the ADK reasoning loop (this handles MCP tool calls autonomously)
-                    full_response_parts = []
-                    async for chunk in execute_agent_turn(user_id, formatted_prompt, state_summary):
-                        full_response_parts.append(chunk)
-                        # 3. Return the response to the UI
-                        await websocket.send_json({
-                            "status": "streaming",
-                            "action": "ide_token",
-                            "token": chunk
-                        })
-                    full_response = "".join(full_response_parts)
+                    full_response = await call_vertex_agent(user_id, formatted_prompt, state_summary)
+                    
+                    await websocket.send_json({
+                        "status": "streaming",
+                        "action": "ide_token",
+                        "token": full_response
+                    })
                         
                     await websocket.send_json({
                         "status": "success",

@@ -3,7 +3,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Install required system packages if needed
-# RUN apt-get update && apt-get install -y --no-install-recommends ...
+RUN apt-get update && apt-get install -y --no-install-recommends ngspice && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
 COPY requirements.txt .
