@@ -81,39 +81,39 @@ async def ws_ide_chat(websocket: WebSocket, token: str = Query(None)):
                 
                 full_response = ""
                 try:
-                    # Limit the history context sent to the LLM to the last 5 messages
-                    history_context = chat_history[:-1][-5:] if len(chat_history) > 1 else []
-                    session_total_tokens = session.get("total_tokens", {"input": 0, "output": 0}) if session else {"input": 0, "output": 0}
-                    if isinstance(session_total_tokens, int):
-                        session_total_tokens = {"input": 0, "output": session_total_tokens}
+                    # 1. Compress the state for the ADK agent
+                    from app.schemas.circuit import CircuitSchematic
+                    from app.google_agent.state_injection import summarize_circuit_state
+                    from app.google_agent.agent import execute_agent_turn
                     
-                    for chunk in stream_ide_chat(formatted_prompt, history_context, canvas_context):
-                        if isinstance(chunk, dict) and "token_usage" in chunk:
-                            usage = chunk["token_usage"]
-                            if isinstance(usage, dict):
-                                session_total_tokens["input"] += usage.get("input", 0)
-                                session_total_tokens["output"] += usage.get("output", 0)
-                            else:
-                                session_total_tokens["output"] += usage
-                            await websocket.send_json({
-                                "status": "success",
-                                "action": "token_usage",
-                                "usage": usage,
-                                "session_total": session_total_tokens
-                            })
-                            continue
-                            
-                        full_response += chunk
+                    if canvas_context:
+                        try:
+                            schematic = CircuitSchematic(**canvas_context)
+                            state_summary = summarize_circuit_state(schematic)
+                        except Exception as e:
+                            logger.error(f"State parsing error: {e}")
+                            state_summary = "State unavailable due to parsing error."
+                    else:
+                        state_summary = "The canvas is currently empty."
+                        
+                    # 2. Execute the ADK reasoning loop (this handles MCP tool calls autonomously)
+                    full_response_parts = []
+                    async for chunk in execute_agent_turn(user_id, formatted_prompt, state_summary):
+                        full_response_parts.append(chunk)
+                        # 3. Return the response to the UI
                         await websocket.send_json({
                             "status": "streaming",
                             "action": "ide_token",
                             "token": chunk
                         })
+                    full_response = "".join(full_response_parts)
                         
                     await websocket.send_json({
                         "status": "success",
                         "action": "ide_chat_complete"
                     })
+                    
+                    session_total_tokens = session.get("total_tokens", {"input": 0, "output": 0}) if session else {"input": 0, "output": 0}
                     
                     # Save both to DB
                     chat_history.append({"role": "model", "content": full_response})

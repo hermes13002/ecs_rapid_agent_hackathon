@@ -1,16 +1,21 @@
 FROM python:3.12-slim
 
-RUN apt-get update && \
-    apt-get install -y ngspice libngspice0-dev && \
-    rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
+# Install required system packages if needed
+# RUN apt-get update && apt-get install -y --no-install-recommends ...
+
+# Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app/ /app/app/
+# Copy source code
+COPY . .
 
-EXPOSE 8000
+# Expose port (Cloud Run maps $PORT, usually 8080)
+EXPOSE 8080
 
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# The default command runs the FastAPI backend.
+# To run the MCP server instead, override the container startup command in Cloud Run to:
+# fastmcp run app.google_agent.mcp_server:mcp --transport sse --port 8080
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

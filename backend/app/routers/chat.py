@@ -30,3 +30,63 @@ async def get_chat_session_history(session_id: str, user_id: str = Depends(get_c
     if session:
         return {"history": session.get("history", [])}
     return {"history": []}
+
+from pydantic import BaseModel
+from app.schemas.circuit import CircuitSchematic
+from app.google_agent.state_injection import summarize_circuit_state
+import os
+from google.cloud.dialogflowcx_v3beta1.services.sessions.async_client import SessionsAsyncClient
+from google.cloud.dialogflowcx_v3beta1.types import session
+
+class ChatRequest(BaseModel):
+    message: str
+    circuit_state: CircuitSchematic
+
+async def call_vertex_agent(user_id: str, message: str, summary: str) -> str:
+    project_id = os.getenv("GCP_PROJECT_ID")
+    location_id = os.getenv("GCP_LOCATION")
+    agent_id = os.getenv("GCP_AGENT_ID")
+    
+    if not project_id or not location_id or not agent_id:
+        return "System Error: GCP Agent Builder credentials not configured in .env"
+        
+    client_options = None
+    if location_id != "global":
+        api_endpoint = f"{location_id}-dialogflow.googleapis.com:443"
+        client_options = {"api_endpoint": api_endpoint}
+    
+    session_client = SessionsAsyncClient(client_options=client_options)
+    session_path = session_client.session_path(
+        project=project_id,
+        location=location_id,
+        agent=agent_id,
+        session=user_id,
+    )
+
+    injected_prompt = f"[SYSTEM CONTEXT]\nUser ID for tool execution: {user_id}\nCurrent Circuit Topology Summary:\n{summary}\n[END CONTEXT]\n\nUser Query: {message}"
+
+    text_input = session.TextInput(text=injected_prompt)
+    query_input = session.QueryInput(text=text_input, language_code="en")
+    request = session.DetectIntentRequest(
+        session=session_path, query_input=query_input
+    )
+    
+    response = await session_client.detect_intent(request=request)
+    
+    response_texts = []
+    for msg in response.query_result.response_messages:
+        if msg.text:
+            response_texts.append("".join(msg.text.text))
+            
+    return "\n".join(response_texts) if response_texts else "No response from agent."
+
+@router.post("/message")
+async def send_chat_message(request: ChatRequest, user_id: str = Depends(get_current_user)):
+    # compress state
+    summary = summarize_circuit_state(request.circuit_state)
+    
+    # run Vertex AI Agent Builder loop
+    agent_response = await call_vertex_agent(user_id, request.message, summary)
+    
+    # return reply
+    return {"reply": agent_response}
