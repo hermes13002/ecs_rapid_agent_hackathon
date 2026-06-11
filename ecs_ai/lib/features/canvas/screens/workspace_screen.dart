@@ -456,6 +456,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
               _updateConnectionStates();
             }
           }
+        } else if (actionType == 'configure_simulation') {
+          _simulationConfig = Map<String, dynamic>.from(payload);
         }
       }
     });
@@ -830,6 +832,36 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                     _initAgent();
                     _loadSessions();
                   },
+                  simulationStatus: _simulationStatus,
+                  isSimulationExpanded: _isSimulationExpanded,
+                  hasDesignErrors: _hasDesignErrors,
+                  simulationConfig: _simulationConfig,
+                  onConfigChanged: (config) {
+                    setState(() {
+                      _simulationConfig = config;
+                      if (config['type'] == 'tran' || config['type'] == 'ac') {
+                        _isSimulationExpanded = true;
+                        _simulationTabIndex = 0; 
+                      }
+                    });
+                    _scheduleSimulation(isManual: config['type'] != 'op');
+                  },
+                  onStop: () {
+                    _debounceTimer?.cancel();
+                    setState(() {
+                      _simulationStatus = 'Ready';
+                      _nodeVoltages.clear();
+                      _componentMetrics.clear();
+                      _timeSeriesData.clear();
+                    });
+                  },
+                  onRun: () {
+                    setState(() => _isSimulationExpanded = true);
+                    _scheduleSimulation(isManual: true);
+                  },
+                  onToggleExpand: () => setState(
+                    () => _isSimulationExpanded = !_isSimulationExpanded,
+                  ),
                 ),
                 const Divider(height: 1),
                 Expanded(
@@ -1478,40 +1510,6 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                     ),
                   ),
                 ],
-                // bottom bar - fixed simulation toolbar
-                SimulationBottomToolbar(
-                  simulationStatus: _simulationStatus,
-                  isSimulationExpanded: _isSimulationExpanded,
-                  hasDesignErrors: _hasDesignErrors,
-                  simulationConfig: _simulationConfig,
-                  onConfigChanged: (config) {
-                    setState(() {
-                      _simulationConfig = config;
-                      // if user selects tran or ac, automatically expand the panel to show graphs
-                      if (config['type'] == 'tran' || config['type'] == 'ac') {
-                        _isSimulationExpanded = true;
-                        _simulationTabIndex = 0; // Waveform Graph tab
-                      }
-                    });
-                    _scheduleSimulation(isManual: config['type'] != 'op');
-                  },
-                  onStop: () {
-                    _debounceTimer?.cancel();
-                    setState(() {
-                      _simulationStatus = 'Ready';
-                      _nodeVoltages.clear();
-                      _componentMetrics.clear();
-                      _timeSeriesData.clear();
-                    });
-                  },
-                  onRun: () {
-                    setState(() => _isSimulationExpanded = true);
-                    _scheduleSimulation(isManual: true);
-                  },
-                  onToggleExpand: () => setState(
-                    () => _isSimulationExpanded = !_isSimulationExpanded,
-                  ),
-                ),
               ],
             ),
             // Notifications Overlay

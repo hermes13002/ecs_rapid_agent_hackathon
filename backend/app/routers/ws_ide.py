@@ -83,26 +83,31 @@ async def ws_ide_chat(websocket: WebSocket, token: str = Query(None)):
                 try:
                     from app.schemas.circuit import CircuitSchematic
                     from app.google_agent.state_injection import summarize_circuit_state
-                    from app.routers.chat import call_vertex_agent
+                    from app.agent.ide_agent import stream_ide_chat
                     
                     if canvas_context:
                         try:
-                            schematic = CircuitSchematic(**canvas_context)
-                            state_summary = summarize_circuit_state(schematic)
+                            # We can just pass the raw dict to the agent now
+                            pass
                         except Exception as e:
                             logger.error(f"State parsing error: {e}")
-                            state_summary = "State unavailable due to parsing error."
-                    else:
-                        state_summary = "The canvas is currently empty."
-                        
-                    full_response = await call_vertex_agent(user_id, formatted_prompt, state_summary)
-                    
-                    await websocket.send_json({
-                        "status": "streaming",
-                        "action": "ide_token",
-                        "token": full_response
-                    })
-                        
+                            
+                    session_total_tokens = session.get("total_tokens", {"input": 0, "output": 0}) if session else {"input": 0, "output": 0}
+                            
+                    async for token_or_dict in stream_ide_chat(formatted_prompt, chat_history, canvas_context):
+                        if isinstance(token_or_dict, dict) and "token_usage" in token_or_dict:
+                            session_total_tokens["input"] += token_or_dict["token_usage"]["input"]
+                            session_total_tokens["output"] += token_or_dict["token_usage"]["output"]
+                            continue
+                            
+                        if isinstance(token_or_dict, str):
+                            full_response += token_or_dict
+                            await websocket.send_json({
+                                "status": "streaming",
+                                "action": "ide_token",
+                                "token": token_or_dict
+                            })
+                            
                     await websocket.send_json({
                         "status": "success",
                         "action": "ide_chat_complete"

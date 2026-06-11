@@ -8,11 +8,13 @@ from app.agent.ide_tools import get_ide_tools
 
 logger = logging.getLogger(__name__)
 
-IDE_SYSTEM_PROMPT = """You are an expert AI Circuit Architect acting as an IDE pair-programmer.
+IDE_SYSTEM_PROMPT = r"""You are an expert AI Circuit Architect acting as an IDE pair-programmer.
 Your goal is to build and modify electronic circuits directly on the user's canvas.
 
 You have access to granular tools:
 - inspect_canvas: Use this to check the current layout or read component values if you need context before acting.
+- mongodb_get_component_spec: Query the database to check the actual specifications of a component (e.g. forward voltage of an LED) BEFORE placing it.
+- configure_simulation: Change the simulation type to transient (tran) or AC sweep (ac) if the user asks for time-domain or frequency-domain analysis.
 - add_component: Place new components in empty space (snap to grid).
 - update_component: Change values or properties.
 - delete_element: Remove wires or components.
@@ -118,7 +120,7 @@ def parse_chat_history(history: list[dict]) -> list[types.Content]:
     return contents
 
 
-def stream_ide_chat(
+async def stream_ide_chat(
     user_prompt: str,
     chat_history: list[dict],
     canvas_context: dict | None = None
@@ -138,7 +140,8 @@ def stream_ide_chat(
     contents.append(types.Content(role="user", parts=[types.Part.from_text(text=enhanced_prompt)]))
     
     try:
-        stream = client.models.generate_content_stream(
+        while True:
+            stream = await client.aio.models.generate_content_stream(
             model="gemini-3.5-flash",
             contents=contents,
             config=types.GenerateContentConfig(
@@ -149,39 +152,70 @@ def stream_ide_chat(
             )
         )
 
-        import json
-        
-        is_tool_call = False
-        for chunk in stream:
-            if chunk.candidates and chunk.candidates[0].content.parts:
-                for part in chunk.candidates[0].content.parts:
-                    if getattr(part, "text", None):
-                        yield part.text
-                        
-                    if getattr(part, "function_call", None):
-                        if not is_tool_call:
-                            is_tool_call = True
-                            yield "\n```json\n"
+            import json
+            from mcp.client.sse import sse_client
+            from mcp.client.session import ClientSession
+            
+            is_tool_call = False
+            tool_name = None
+            tool_args = {}
+            tool_response = None
+            
+            async for chunk in stream:
+                if chunk.candidates and chunk.candidates[0].content.parts:
+                    for part in chunk.candidates[0].content.parts:
+                        if getattr(part, "text", None):
+                            yield part.text
                             
-                        tc = part.function_call
-                        if tc.name:
-                            logger.info(f"Tool used: {tc.name}")
-                            # In google.genai, args can be accessed via tc.args
-                            args = getattr(tc, "args", {})
-                            payload = {
-                                "action_type": tc.name,
-                                "payload": args
-                            }
-                            yield json.dumps(payload) + "\n"
-                        
-            if getattr(chunk, "usage_metadata", None):
-                yield {"token_usage": {
-                    "input": getattr(chunk.usage_metadata, "prompt_token_count", 0),
-                    "output": getattr(chunk.usage_metadata, "candidates_token_count", 0)
-                }}
-                        
-        if is_tool_call:
-            yield "```\n"
+                        if getattr(part, "function_call", None):
+                            if not is_tool_call:
+                                is_tool_call = True
+                                
+                            tc = part.function_call
+                            if tc.name:
+                                tool_name = tc.name
+                                tool_args = getattr(tc, "args", {})
+                                logger.info(f"Tool used: {tool_name}")
+                                
+                                if tool_name == "mongodb_get_component_spec":
+                                    # Execute MCP tool silently, do not yield to frontend
+                                    mcp_url = os.environ.get("MCP_SERVER_URL", "http://localhost:8001/sse")
+                                    try:
+                                        async with sse_client(mcp_url) as (read, write):
+                                            async with ClientSession(read, write) as session:
+                                                await session.initialize()
+                                                result = await session.call_tool(tool_name, arguments=tool_args)
+                                                spec_text = result.content[0].text if result.content else "Success"
+                                                tool_response = spec_text
+                                    except Exception as e:
+                                        tool_response = f"Database query failed: {str(e)}"
+                                else:
+                                    # Canvas mutation tool - yield to frontend
+                                    yield "\n```json\n"
+                                    payload = {
+                                        "action_type": tool_name,
+                                        "payload": tool_args
+                                    }
+                                    yield json.dumps(payload) + "\n"
+                            
+                if getattr(chunk, "usage_metadata", None):
+                    yield {"token_usage": {
+                        "input": getattr(chunk.usage_metadata, "prompt_token_count", 0),
+                        "output": getattr(chunk.usage_metadata, "candidates_token_count", 0)
+                    }}
+                            
+            if is_tool_call and tool_name != "mongodb_get_component_spec":
+                yield "```\n"
+                break # Canvas tools require frontend interaction, so we stop here
+                
+            if tool_response is not None:
+                # We executed the mongodb tool. Feed it back to the model and loop!
+                contents.append(types.Content(
+                    role="user", 
+                    parts=[types.Part.from_text(text=f"Tool {tool_name} returned:\n{tool_response}\n\nContinue your task.")]
+                ))
+            else:
+                break # Normal text response finished
 
     except APIError as e:
         error_str = str(e)

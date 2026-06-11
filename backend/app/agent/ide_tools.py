@@ -67,6 +67,33 @@ def get_ide_tools() -> list[types.Tool]:
                         },
                         required=["source_pin_id", "target_pin_id"]
                     )
+                ),
+                types.FunctionDeclaration(
+                    name="configure_simulation",
+                    description="Tool to configure the circuit simulation parameters. Always use this to switch to transient (tran) or AC sweep (ac) analysis when the user asks.",
+                    parameters=types.Schema(
+                        type="OBJECT",
+                        properties={
+                            "type": types.Schema(type="STRING", description="Simulation type. Must be 'op' (Operating Point), 'tran' (Transient), or 'ac' (AC Sweep)"),
+                            "step": types.Schema(type="STRING", description="Time step for transient analysis (e.g., '1ms')"),
+                            "stop": types.Schema(type="STRING", description="Stop time for transient analysis (e.g., '10ms')"),
+                            "points": types.Schema(type="INTEGER", description="Number of points per decade for AC sweep (e.g., 10)"),
+                            "fstart": types.Schema(type="STRING", description="Start frequency for AC sweep (e.g., '1')"),
+                            "fstop": types.Schema(type="STRING", description="Stop frequency for AC sweep (e.g., '10k')")
+                        },
+                        required=["type"]
+                    )
+                ),
+                types.FunctionDeclaration(
+                    name="mongodb_get_component_spec",
+                    description="Queries the MongoDB database for electrical specifications of a given component. Always use this tool to verify specifications (e.g., max current, forward voltage) before placing components.",
+                    parameters=types.Schema(
+                        type="OBJECT",
+                        properties={
+                            "component_type": types.Schema(type="STRING", description="The type of component (e.g., 'led', 'resistor', 'capacitor').")
+                        },
+                        required=["component_type"]
+                    )
                 )
             ]
         )

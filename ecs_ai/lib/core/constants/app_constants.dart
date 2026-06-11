@@ -31,8 +31,11 @@ abstract final class AppConstants {
 /// global configuration for api connections
 abstract final class ApiConstants {
   // IMPORTANT: For local development, use localhost.
-  static const String baseUrl = 'https://ecs-backend-609652852189.europe-west2.run.app';
-  static const String wsUrl = 'wss://ecs-backend-609652852189.europe-west2.run.app:443';
+  static const String baseUrl = 'http://127.0.0.1:8080';
+  static const String wsUrl = 'ws://127.0.0.1:8080';
+
+  // static const String baseUrl = 'https://ecs-backend-609652852189.europe-west2.run.app';
+  // static const String wsUrl = 'wss://ecs-backend-609652852189.europe-west2.run.app:443';
 
   // static const String baseUrl = 'https://ecs-rapid-agent-hackathon-609652852189.africa-south1.run.app';
   // static const String wsUrl = 'wss://ecs-rapid-agent-hackathon-609652852189.africa-south1.run.app';

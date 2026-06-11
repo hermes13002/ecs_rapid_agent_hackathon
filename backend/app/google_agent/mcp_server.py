@@ -82,5 +82,5 @@ def add_wire(user_id: str, source_pin_id: str, target_pin_id: str) -> str:
     return _post_to_backend(user_id, "add_wire", {"source_pin_id": source_pin_id, "target_pin_id": target_pin_id})
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 8001))
     mcp.run(transport="sse", host="0.0.0.0", port=port)

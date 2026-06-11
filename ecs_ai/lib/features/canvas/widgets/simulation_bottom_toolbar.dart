@@ -28,10 +28,10 @@ class SimulationBottomToolbar extends StatelessWidget {
   Widget build(BuildContext context) {
     final isSimError = simulationStatus.startsWith('Error:');
     final hasAnyError = hasDesignErrors || isSimError;
-    
+
     String errorText = 'No Design Errors';
     String fullErrorText = 'Circuit is ready for simulation.';
-    
+
     if (hasDesignErrors) {
       errorText = 'Design Errors';
       fullErrorText = 'There are logic or schematic design errors.';
@@ -60,7 +60,9 @@ class SimulationBottomToolbar extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  hasAnyError ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                  hasAnyError
+                      ? Icons.warning_amber_rounded
+                      : Icons.check_circle_outline,
                   color: hasAnyError ? AppColors.error : Colors.white,
                   size: 18,
                 ),
@@ -113,12 +115,16 @@ class SimulationBottomToolbar extends StatelessWidget {
             ),
             const SizedBox(width: 12),
           ],
-          
+
           MouseRegion(
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
               onTap: () {
-                _showSimulationSettingsModal(context, simulationConfig, onConfigChanged);
+                showSimulationSettingsModal(
+                  context,
+                  simulationConfig,
+                  onConfigChanged,
+                );
               },
               child: Tooltip(
                 message: 'Simulation Settings',
@@ -134,8 +140,13 @@ class SimulationBottomToolbar extends StatelessWidget {
                       const Icon(Icons.tune, color: Colors.white, size: 14),
                       const SizedBox(width: 6),
                       Text(
-                        (simulationConfig['type'] as String? ?? 'op').toUpperCase(),
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                        (simulationConfig['type'] as String? ?? 'op')
+                            .toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -185,12 +196,18 @@ class SimulationBottomToolbar extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: isSimulationExpanded ? Colors.white : Colors.transparent,
+                  color: isSimulationExpanded
+                      ? Colors.white
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Icon(
-                  isSimulationExpanded ? Icons.analytics : Icons.analytics_outlined,
-                  color: isSimulationExpanded ? Colors.black : AppColors.textSecondary,
+                  isSimulationExpanded
+                      ? Icons.analytics
+                      : Icons.analytics_outlined,
+                  color: isSimulationExpanded
+                      ? Colors.black
+                      : AppColors.textSecondary,
                   size: 20,
                 ),
               ),
@@ -202,7 +219,7 @@ class SimulationBottomToolbar extends StatelessWidget {
   }
 }
 
-void _showSimulationSettingsModal(
+void showSimulationSettingsModal(
   BuildContext context,
   Map<String, dynamic> config,
   ValueChanged<Map<String, dynamic>> onConfigChanged,
@@ -229,10 +246,10 @@ void _showSimulationSettingsModal(
       return FadeTransition(
         opacity: anim1,
         child: ScaleTransition(
-          scale: Tween<double>(begin: 0.95, end: 1.0).animate(CurvedAnimation(
-            parent: anim1,
-            curve: Curves.easeOutBack,
-          )),
+          scale: Tween<double>(
+            begin: 0.95,
+            end: 1.0,
+          ).animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutBack)),
           child: child,
         ),
       );
@@ -250,7 +267,8 @@ class _SimulationSettingsModal extends StatefulWidget {
   });
 
   @override
-  State<_SimulationSettingsModal> createState() => _SimulationSettingsModalState();
+  State<_SimulationSettingsModal> createState() =>
+      _SimulationSettingsModalState();
 }
 
 class _SimulationSettingsModalState extends State<_SimulationSettingsModal> {
@@ -265,11 +283,21 @@ class _SimulationSettingsModalState extends State<_SimulationSettingsModal> {
   void initState() {
     super.initState();
     _config = Map<String, dynamic>.from(widget.initialConfig);
-    _stopCtrl = TextEditingController(text: _config['stop']?.toString() ?? '100ms');
-    _stepCtrl = TextEditingController(text: _config['step']?.toString() ?? '1ms');
-    _ptsCtrl = TextEditingController(text: _config['points']?.toString() ?? '10');
-    _fstartCtrl = TextEditingController(text: _config['fstart']?.toString() ?? '1');
-    _fstopCtrl = TextEditingController(text: _config['fstop']?.toString() ?? '100k');
+    _stopCtrl = TextEditingController(
+      text: _config['stop']?.toString() ?? '100ms',
+    );
+    _stepCtrl = TextEditingController(
+      text: _config['step']?.toString() ?? '1ms',
+    );
+    _ptsCtrl = TextEditingController(
+      text: _config['points']?.toString() ?? '10',
+    );
+    _fstartCtrl = TextEditingController(
+      text: _config['fstart']?.toString() ?? '1',
+    );
+    _fstopCtrl = TextEditingController(
+      text: _config['fstop']?.toString() ?? '100k',
+    );
   }
 
   @override
@@ -332,7 +360,11 @@ class _SimulationSettingsModalState extends State<_SimulationSettingsModal> {
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.close, color: AppColors.textSecondary, size: 20),
+                  icon: const Icon(
+                    Icons.close,
+                    color: AppColors.textSecondary,
+                    size: 20,
+                  ),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onPressed: () => Navigator.of(context).pop(),
@@ -342,10 +374,7 @@ class _SimulationSettingsModalState extends State<_SimulationSettingsModal> {
           ),
           const Divider(height: 1, color: AppColors.panelBorder),
           // Body
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: _buildConfigForm(),
-          ),
+          Padding(padding: const EdgeInsets.all(20), child: _buildConfigForm()),
           // Footer
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -358,18 +387,29 @@ class _SimulationSettingsModalState extends State<_SimulationSettingsModal> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                   ),
                   onPressed: _apply,
-                  child: const Text('Apply Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Apply Settings',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
@@ -390,7 +430,10 @@ class _SimulationSettingsModalState extends State<_SimulationSettingsModal> {
           value: type,
           items: const [
             DropdownMenuItem(value: 'op', child: Text('Operating Point (DC)')),
-            DropdownMenuItem(value: 'tran', child: Text('Transient (Time Domain)')),
+            DropdownMenuItem(
+              value: 'tran',
+              child: Text('Transient (Time Domain)'),
+            ),
             DropdownMenuItem(value: 'ac', child: Text('AC Sweep (Frequency)')),
           ],
           onChanged: (val) {
@@ -411,22 +454,55 @@ class _SimulationSettingsModalState extends State<_SimulationSettingsModal> {
         ),
         const SizedBox(height: 20),
         if (type == 'tran') ...[
-          Text('Transient Settings', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.primary)),
+          Text(
+            'Transient Settings',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.primary),
+          ),
           const SizedBox(height: 12),
-          _buildInputRow('Stop Time', _stopCtrl, 'e.g. 100ms', allowedUnits: const ['', 's', 'ms', 'us', 'ns']),
+          _buildInputRow(
+            'Stop Time',
+            _stopCtrl,
+            'e.g. 100ms',
+            allowedUnits: const ['', 's', 'ms', 'us', 'ns'],
+          ),
           const SizedBox(height: 12),
-          _buildInputRow('Time Step', _stepCtrl, 'e.g. 1ms', allowedUnits: const ['', 's', 'ms', 'us', 'ns']),
+          _buildInputRow(
+            'Time Step',
+            _stepCtrl,
+            'e.g. 1ms',
+            allowedUnits: const ['', 's', 'ms', 'us', 'ns'],
+          ),
         ] else if (type == 'ac') ...[
-          Text('AC Sweep Settings', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.primary)),
+          Text(
+            'AC Sweep Settings',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.primary),
+          ),
           const SizedBox(height: 12),
           _buildInputRow('Points/Decade', _ptsCtrl, 'e.g. 10'),
           const SizedBox(height: 12),
-          _buildInputRow('Start Freq', _fstartCtrl, 'e.g. 1', allowedUnits: const ['', 'Hz', 'kHz', 'MHz', 'GHz']),
+          _buildInputRow(
+            'Start Freq',
+            _fstartCtrl,
+            'e.g. 1',
+            allowedUnits: const ['', 'Hz', 'kHz', 'MHz', 'GHz'],
+          ),
           const SizedBox(height: 12),
-          _buildInputRow('Stop Freq', _fstopCtrl, 'e.g. 100k', allowedUnits: const ['', 'Hz', 'kHz', 'MHz', 'GHz']),
+          _buildInputRow(
+            'Stop Freq',
+            _fstopCtrl,
+            'e.g. 100k',
+            allowedUnits: const ['', 'Hz', 'kHz', 'MHz', 'GHz'],
+          ),
         ] else ...[
-          const Text('No additional settings required for OP.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-        ]
+          const Text(
+            'No additional settings required for OP.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          ),
+        ],
       ],
     );
   }
@@ -440,7 +516,12 @@ class _SimulationSettingsModalState extends State<_SimulationSettingsModal> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
+        Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+        ),
         const SizedBox(height: 6),
         Container(
           height: 40,
@@ -455,8 +536,13 @@ class _SimulationSettingsModalState extends State<_SimulationSettingsModal> {
               value: value,
               isExpanded: true,
               dropdownColor: AppColors.panel,
-              icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white),
+              icon: const Icon(
+                Icons.arrow_drop_down,
+                color: AppColors.textSecondary,
+              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.white),
               onChanged: onChanged,
               items: items,
             ),
@@ -466,12 +552,22 @@ class _SimulationSettingsModalState extends State<_SimulationSettingsModal> {
     );
   }
 
-  Widget _buildInputRow(String label, TextEditingController controller, String hint, {List<String>? allowedUnits}) {
+  Widget _buildInputRow(
+    String label,
+    TextEditingController controller,
+    String hint, {
+    List<String>? allowedUnits,
+  }) {
     return Row(
       children: [
         Expanded(
           flex: 2,
-          child: Text(label, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white)),
+          child: Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: Colors.white),
+          ),
         ),
         Expanded(
           flex: 3,
@@ -485,16 +581,36 @@ class _SimulationSettingsModalState extends State<_SimulationSettingsModal> {
                   height: 36,
                   child: TextField(
                     controller: controller,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: Colors.white),
                     decoration: InputDecoration(
                       hintText: hint,
-                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                      hintStyle: TextStyle(
+                        color: Colors.white.withOpacity(0.3),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 0,
+                      ),
                       filled: true,
                       fillColor: AppColors.surface,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.panelBorder)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.panelBorder)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppColors.primary)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: const BorderSide(
+                          color: AppColors.panelBorder,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: const BorderSide(
+                          color: AppColors.panelBorder,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: const BorderSide(color: AppColors.primary),
+                      ),
                     ),
                   ),
                 ),
