@@ -85,7 +85,7 @@ def generate_chat_title(user_prompt: str) -> str:
     client = _build_client()
     try:
         response = client.models.generate_content(
-            model="gemini-3.5-flash",
+            model="gemini-2.5-flash",
             contents=user_prompt,
             config=types.GenerateContentConfig(
                 system_instruction="You are a title generator. Generate a concise, descriptive title (maximum 4 words) for the user's prompt. ONLY output the title text. Do NOT add any quotes, punctuation, or word counts.",
@@ -142,7 +142,7 @@ async def stream_ide_chat(
     try:
         while True:
             stream = await client.aio.models.generate_content_stream(
-            model="gemini-3.5-flash",
+            model="gemini-2.5-flash",
             contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction=IDE_SYSTEM_PROMPT,
