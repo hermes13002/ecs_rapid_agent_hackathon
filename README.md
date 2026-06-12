@@ -1,21 +1,48 @@
 # Electronic Circuit Simulator AI (ECS AI)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A modern, high-performance Electronic Design Automation (EDA) and schematic capture tool. It features a custom Flutter graphics engine, a Python-powered SPICE simulation backend, and deep AI co-pilot capabilities powered by **Gemini 1.5 Pro** to assist in real-time circuit design, simulation, and troubleshooting.
+**🏆 Google Cloud Rapid Agent Hackathon Submission**
+*Built with our hackathon partner **MongoDB**. We developed a custom autonomous agent deeply integrated with a MongoDB Model Context Protocol (MCP) server to achieve data-grounded, "beyond-chat" agency.*
+
+A modern, high-performance Electronic Design Automation (EDA) and schematic capture tool. It features a custom Flutter graphics engine, a Python-powered SPICE simulation backend, and deep AI co-pilot capabilities powered by **Gemini 2.5 Pro** to assist in real-time circuit design, simulation, and troubleshooting.
 
 ![Electronic Circuit Simulator Preview](preview.png)
 
+## Hackathon Submission Details
+
+- **Hosted Project for Judging & Testing**: [ecs-ai.web.app](https://ecs-ai-4205a.web.app/)
+
+
+### Project Description
+**Summary of Features and Functionality:**
+ECS AI is an autonomous, agent-driven Electronic Design Automation (EDA) tool. It enables real-time circuit design, schematic capture, and simulation through a custom high-performance Flutter canvas and a Python SPICE backend. The Gemini 2.5 Pro AI co-pilot is contextually aware of circuit state, capable of autonomous schematic manipulation, and can proactively diagnose and resolve simulation failures.
+
+**Google Cloud & Core Technologies Used:**
+- **Google GenAI SDK**: Serves as the orchestration layer for our custom Python agent, enabling robust tool-calling and asynchronous communication.
+- **Gemini 2.5 Pro**: The core reasoning engine. It processes our injected JSON circuit state, understands complex node physics, and executes multi-step schematic manipulations.
+- **Google Cloud Run**: Provides scalable, containerized production deployment for our FastAPI backend, WebSocket engine, and Python agent.
+- **Firebase Hosting**: Serves our high-performance Flutter web canvas to users worldwide with ultra-low latency.
+- **Partner Integration**: **MongoDB** (via a custom Python FastMCP Server) for data-grounded agent reasoning and persistent storage.
+- **Core Engine**: Flutter (Dart) Frontend, FastAPI (Python) & Ngspice Backend.
+
+**Data Sources Used:**
+- **MongoDB via FastMCP**: Leveraged a native FastMCP Server to query MongoDB for historical project schemas, component metadata, and component specifications, allowing the agent to perform data-grounded reasoning during circuit design.
+
+**Findings and Learnings:**
+Building ECS AI demonstrated the power of integrating the Model Context Protocol (MCP) with an autonomous agent. Exposing our MongoDB component database and local schematic tools through a FastMCP interface transformed the agent from a passive chatbot into an active participant. We learned that decoupling the simulation engine (SPICE) from the frontend state using WebSocket streams allowed the AI to manipulate the circuit seamlessly without UI lockups. Additionally, injecting the serialized circuit state directly into the agent's system prompt eliminated inspect-loop latency and drastically improved Gemini 2.5 Pro's reasoning capabilities regarding spatial node connections and complex electronic physics.
+
 ## Tech Stack
 
+* **Google Cloud Run & Firebase Hosting**: Containerized and deployed infrastructure guaranteeing high availability and low-latency WebSocket communication.
+* **Google GenAI SDK & Gemini 2.5 Pro**: Orchestrates the asynchronous, autonomous agent capable of driving the simulation engine via decoupled tools and deep reasoning.
+* **Database & MCP (MongoDB)**: Integrated natively via a custom Python **FastMCP Server** to provide the agent with real-time hardware component data (Partner integration).
 * **Frontend**: Flutter (Dart) for high-performance, 60fps canvas rendering across Desktop, Web, Tablet.
-* **Backend**: FastAPI (Python) for ultra-fast WebSocket communication, REST endpoints, and system orchestration.
-* **Simulation Core**: PySpice & Ngspice for accurate physics and electronic node calculations.
-* **Database & MCP**: MongoDB, integrated natively via a custom Python **FastMCP Server** to provide the agent with real-time hardware component data.
-* **AI Integration**: **Google GenAI SDK** and **Gemini 1.5 Pro** orchestrating an asynchronous, autonomous agent capable of driving the simulation engine via decoupled tools.
+* **Backend & Simulation**: FastAPI (Python) and Spicelib/Ngspice for ultra-fast REST/WebSocket routing and accurate physics node calculations.
 
 ## Features
 
-### Agentic Orchestration (Powered by Gemini 1.5 Pro)
+### Agentic Orchestration (Powered by Gemini 2.5 Pro)
 * **State-Injected Contextual Awareness**: Real-time circuit topologies are serialized directly into the agent's system prompt, eliminating inspect-loop latency for instant reasoning.
 * **Autonomous Schematic Manipulation**: The custom agent securely maps Gemini's function calls to your local functions to programmatically inject, modify, or tear down schematic elements on the live canvas.
 * **Heuristic Diagnostics**: The agent proactively intercepts simulation failures, cross-referencing node physics to generate actionable, multi-step resolution strategies.
@@ -29,9 +56,9 @@ A modern, high-performance Electronic Design Automation (EDA) and schematic capt
 * **Professional UI Architecture**: Modern, dark-themed UI components built with robust flex-layouts and custom typography, completely avoiding default structural overflows.
 
 ### Hybrid Backend Architecture
-* **Synchronous SPICE Translation**: Low-latency translation layer mapping JSON-defined node graphs into valid Ngspice netlists for Operating Point (OP) analysis.
-* **Bi-directional WebSocket Pipeline**: Decoupled socket architecture for continuous telemetry streaming, syncing hardware physics back to the UI state without polling latency.
-* **Proxy Tool Execution**: Core system tools (`ide_tools`) are bound to the cloud agent via the FastMCP server, serving as the bridge for autonomous agent execution and real-time state broadcasting.
+* **Multi-Domain SPICE Engine & Data Parser**: High-performance translation layer mapping JSON node graphs to valid Ngspice netlists, supporting Operating Point (OP), Transient (time-series), and AC Sweep (frequency) simulations. An advanced parser processes complex simulation outputs for real-time frontend waveform visualization.
+* **Bi-directional WebSocket Pipeline**: Decoupled, asynchronous socket architecture ensuring continuous telemetry streaming. It syncs live hardware physics (voltage, current) and extensive waveform datasets back to the UI state instantly, completely eliminating polling latency.
+* **Autonomous Agent Orchestrator**: Functions as the central nervous system bridging the Flutter IDE, Gemini 2.5 Pro, and the MongoDB FastMCP server. It dynamically binds local system tools (`ide_tools`) to the agent, enabling secure, real-time autonomous schematic manipulation and automatic simulation configuration on the user's canvas.
 
 ## Architecture Flow (Custom Agent Model)
 
@@ -50,7 +77,7 @@ graph TD
     end
 
     subgraph Google Cloud
-        Gemini((Gemini 1.5 Pro))
+        Gemini((Gemini 2.5 Pro))
     end
 
     subgraph Data & MCP
@@ -72,35 +99,58 @@ graph TD
     SE <-->|Sim Results| WS
 ```
 
-## Example Workflow
+## Judging Workflow: End-to-End User Journey
 
-1. **Start a Design**: The user opens the application and drops a Voltage Source and a Resistor onto the infinite canvas using the left toolbar.
-2. **Wire the Circuit**: Using the Wire tool (hotkey **W**), the user clicks to connect the pins of the components, creating a closed loop. The wire router automatically generates clean, right-angled paths.
-3. **Run Simulation**: The user clicks the **Simulate** button. The frontend sends the circuit JSON to the Python backend over a WebSocket. The backend translates it to a SPICE netlist, runs Ngspice, and returns the nodal voltages and pin currents.
-4. **Visual Feedback**: Instantly, animated yellow electrons begin flowing around the wires on the canvas, indicating the direction of current.
-5. **AI Interaction**: The user isn't sure how to add an LED without burning it out. They open the AI Chat Panel and ask: *"How do I safely add an LED to this circuit?"*
-6. **Autonomous Agent Execution**: The custom agent leverages the FastMCP Server to look up component specs, uses Gemini 1.5 Pro to calculate the required series resistance, and invokes its native tools to execute the placement and configure the Transient simulation.
-7. **Live Broadcast Update**: The backend updates the session and immediately broadcasts the updated circuit to the frontend via WebSocket, modifying the circuit right before the user's eyes in real-time.
+We have designed a seamless experience for judges to evaluate the platform. Follow these steps to experience the full power of ECS AI:
+
+1. **Authentication (Sign Up / Login)**: Navigate to the hosted web application (https://ecs-ai-4205a.web.app/) and create a new account or log in. This provisions a secure workspace connected to your user ID.
+2. **Workspace Initialization**: Upon login, you'll be greeted by the IDE workspace. You can choose to start a new blank schematic.
+3. **Manual Circuit Design**: Drag and drop basic components from the left toolbar onto the infinite canvas. Use the Wire tool (hotkey **W**) to connect the pins, observing the orthogonal routing algorithm in action.
+   * *Recommended starting circuit:* Place a **Voltage Source** (set to 9V), a **Resistor** (set to 1kΩ), and a **Ground** component. Wire the Voltage Source and Resistor in a simple closed loop, and attach the Ground component to the negative terminal of the circuit.
+4. **Interactive Simulation**: Click the **Simulate** button. The frontend sends the circuit payload via WebSocket to the Python backend, which runs the Ngspice Operating Point (OP) simulation. Instantly, animated electrons will flow across the wires. Hovering over the 1kΩ resistor will reveal a live current of exactly 9mA.
+5. **AI Co-Pilot Interaction**: Open the right-hand AI Chat Panel. Let's test the agent's autonomous capabilities! Type a prompt such as: *"I want to add an LED to this circuit. Please calculate the correct series resistance so it doesn't burn out with my 9V source, and place it for me."*
+6. **Autonomous Agent Execution**: Watch the magic happen. The Gemini 2.5 Pro agent will:
+   * Analyze your current circuit state natively injected into its prompt (recognizing the 9V source and 1kΩ load).
+   * Query the FastMCP server (MongoDB) for optimal LED specifications (e.g., forward voltage and max current).
+   * Calculate the precise series resistance needed.
+   * Autonomously invoke local IDE tools to inject the LED, update the existing resistor's value, and rewire the schematic on the canvas.
+   * Configure and run a Transient simulation sweep automatically.
+7. **Live Broadcast & Visualization**: Without refreshing the page, the backend broadcasts the modifications back to the UI. The circuit will automatically update in front of your eyes. You can then review the generated waveform plots in the simulation panel to verify the LED's forward voltage over time.
 
 ## Setup & Demo Instructions
 
 We have packaged the codebase to be easily run by judges locally:
 
 1. Ensure you have **Python 3.12+** and **Flutter 3.22+** installed on your machine.
-2. In the `backend` folder, install the required python packages:
+2. Ensure you have **MongoDB** installed locally, or have access to a MongoDB Atlas cluster URI.
+3. Install the frontend dependencies:
+   ```bash
+   cd ecs_ai
+   flutter pub get
+   cd ..
+   ```
+4. In the `backend` folder, set up your Python environment:
    ```bash
    cd backend
    python -m venv venv
+   # Windows:
    venv\Scripts\activate
+   # Mac/Linux:
+   # source venv/bin/activate
    pip install -r requirements.txt
    ```
-3. Set your API keys in `backend/.env`:
+5. Set your API keys in `backend/.env`:
    ```env
    GEMINI_API_KEY=your_gemini_key_here
-   MONGO_URI=mongodb://localhost:27017
+   MONGO_URI=mongodb://localhost:27017 # Replace with your Atlas URI if using cloud DB
    ```
-4. Double click the **`start_demo.bat`** file in the root directory! This script will automatically boot up both the FastAPI backend and the Flutter Web Server simultaneously.
-5. Open your browser to `http://localhost:3000` to start exploring the IDE!
+6. **Launch the platform!**
+   * **Windows Users**: Simply double-click the **`start_demo.bat`** file in the root directory. It will automatically launch the backend, frontend, and FastMCP server in parallel.
+   * **Mac/Linux Users**: Open three separate terminals from the root directory and run:
+     * *Terminal 1 (Backend)*: `cd backend && source venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000`
+     * *Terminal 2 (MCP Server)*: `cd backend && source venv/bin/activate && fastmcp run app/google_agent/mcp_server.py --transport sse --port 8001`
+     * *Terminal 3 (Frontend)*: `cd ecs_ai && flutter run -d web-server --web-port 3000`
+7. Open your browser to `http://localhost:3000` to start exploring the IDE!
 
 ## License
 
